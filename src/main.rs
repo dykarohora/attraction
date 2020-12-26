@@ -3,6 +3,7 @@ use std::env;
 use std::io::Read;
 
 use attraction::nes::cartridge::Cartridge;
+use attraction::nes::emulator::Emulator;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -15,6 +16,9 @@ fn main() {
     let mut data = Vec::<u8>::new();
     file.read_to_end(&mut data).expect("Failed read file");
     data.shrink_to_fit();
-    Cartridge::load_rom(&data);
+    let cartridge = Cartridge::load_rom(&data);
+
+    let mut  emulator = Emulator::new(cartridge);
+    emulator.start();
     println!("complete");
 }

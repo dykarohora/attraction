@@ -1,7 +1,9 @@
 use super::rom::Rom;
 
 pub struct Cartridge {
+    program_rom_page_size: u8,
     program_rom: Rom,
+    character_rom_page_size: u8,
     character_rom: Rom,
     mapper: u8,
     is_horizontal_mirror: bool,
@@ -31,10 +33,26 @@ impl Cartridge {
         let flag_seven = data[7];
 
         Cartridge {
+            program_rom_page_size: data[4],
             program_rom: Rom::new(data[16..(program_rom_size + 16)].to_vec()),
+            character_rom_page_size: data[4],
             character_rom: Rom::new(data[(16 + program_rom_size)..(16 + program_rom_size + character_rom_size)].to_vec()),
             mapper: (flag_seven & 0xF0) | (flag_six >> 4),
             is_horizontal_mirror: if flag_six & 0x01 == 0x01 { true } else { false },
+        }
+    }
+
+    pub fn read_byte(&self, address: u16) -> u8 {
+        match address {
+            0x0000..=0x3FFF => self.program_rom.read(address),
+            0x4000..=0x7FFF => {
+                if self.program_rom_page_size == 1 {
+                    self.program_rom.read(address - 0x4000)
+                } else {
+                    self.program_rom.read(address)
+                }
+            }
+            _ => panic!("[Cartridge] Not implemented or invalid address {:#010X}", address)
         }
     }
 }

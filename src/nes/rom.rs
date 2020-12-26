@@ -8,4 +8,8 @@ impl Rom {
             memory: data
         }
     }
+
+    pub fn read(&self, address: u16) -> u8 {
+        self.memory[address as usize]
+    }
 }
