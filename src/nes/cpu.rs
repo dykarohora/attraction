@@ -57,10 +57,17 @@ impl Cpu {
         let opcode = self.fetch_byte();
         println!("opcode: {:#04X}", opcode);
         match opcode {
+            0x4C => self.jmp_absolute(),
             0x78 => self.sei(),
+            0x88 => self.dey(),
+            0x8D => self.sta_absolute(),
             0x9A => self.txs(),
+            0xA0 => self.ldy_immediate(),
             0xA2 => self.ldx_immediate(),
             0xA9 => self.lda_immediate(),
+            0xBD => self.lda_absolute_x(),
+            0xD0 => self.bne(),
+            0xE8 => self.inx(),
             _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
         }
     }
@@ -92,6 +99,16 @@ impl Cpu {
         self.total_cycle += 2
     }
 
+    fn ldy_immediate(&mut self) {
+        let operand = self.fetch_byte();
+        self.y = operand;
+
+        self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.y == 0 { true } else { false };
+
+        self.total_cycle += 2
+    }
+
     fn lda_immediate(&mut self) {
         let operand = self.fetch_byte();
         self.a = operand;
@@ -102,14 +119,70 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn sta_absolute(&mut self) {
+    fn lda_absolute_x(&mut self) {
         let address = self.fetch_word();
+        let byte = self.read_byte(address + self.x as u16);
+        self.a = byte;
+
+        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.a == 0 { true } else { false };
 
         self.total_cycle += 4
     }
 
+    fn sta_absolute(&mut self) {
+        let address = self.fetch_word();
+        self.write_byte(address, self.a);
+
+        self.total_cycle += 4
+    }
+
+    fn inx(&mut self) {
+        self.x = self.x.wrapping_add(1);
+
+        self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.x == 0 { true } else { false };
+
+        self.total_cycle += 2
+    }
+
+    fn dey(&mut self) {
+        self.y = self.y.wrapping_sub(1);
+
+        self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.y == 0 { true } else { false };
+
+        self.total_cycle += 2;
+    }
+
+    fn bne(&mut self) {
+        let mut offset = self.fetch_byte();
+
+        if self.status.zero == false {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    // self.pc.wrapping_sub(offset as u16)
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            };
+        }
+
+        self.total_cycle += 2
+    }
+
+    fn jmp_absolute(&mut self) {
+        let address = self.fetch_word();
+        self.pc = address;
+        self.total_cycle += 3
+    }
+
     fn txs(&mut self) {
         self.sp = self.x;
+
         self.total_cycle += 2
     }
 
@@ -121,6 +194,10 @@ impl Cpu {
         let low = self.bus.read_byte(address) as u16;
         let high = self.bus.read_byte(address + 1) as u16;
         (high << 8) | low
+    }
+
+    fn write_byte(&mut self, address: u16, byte: u8) {
+        self.bus.write_byte(address, byte)
     }
 }
 
