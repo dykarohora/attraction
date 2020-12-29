@@ -1,6 +1,8 @@
 use std::fmt;
 use crate::nes::cpu_bus::CpuBus;
 use std::fmt::Formatter;
+use crate::nes::cartridge::Cartridge;
+use crate::nes::ppu::Ppu;
 
 pub struct Cpu {
     a: u8,
@@ -45,41 +47,41 @@ impl Cpu {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
         self.total_cycle = 0;
         self.status.break_flg = true;
         self.status.interrupt = true;
         self.sp = 0xFD;
-        self.pc = self.read_word(0xFFFC);
+        self.pc = self.read_word(cartridge, ppu, 0xFFFC);
     }
 
-    pub fn run_instruction(&mut self) {
-        let opcode = self.fetch_byte();
+    pub fn run_instruction(&mut self, cartridge: &mut Cartridge, ppu: &mut Ppu) {
+        let opcode = self.fetch_byte(cartridge, ppu);
         println!("opcode: {:#04X}", opcode);
         match opcode {
-            0x4C => self.jmp_absolute(),
+            0x4C => self.jmp_absolute(cartridge, ppu),
             0x78 => self.sei(),
             0x88 => self.dey(),
-            0x8D => self.sta_absolute(),
+            0x8D => self.sta_absolute(cartridge, ppu),
             0x9A => self.txs(),
-            0xA0 => self.ldy_immediate(),
-            0xA2 => self.ldx_immediate(),
-            0xA9 => self.lda_immediate(),
-            0xBD => self.lda_absolute_x(),
-            0xD0 => self.bne(),
+            0xA0 => self.ldy_immediate(cartridge, ppu),
+            0xA2 => self.ldx_immediate(cartridge, ppu),
+            0xA9 => self.lda_immediate(cartridge, ppu),
+            0xBD => self.lda_absolute_x(cartridge, ppu),
+            0xD0 => self.bne(cartridge, ppu),
             0xE8 => self.inx(),
             _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
         }
     }
 
-    fn fetch_byte(&mut self) -> u8 {
-        let byte = self.read_byte(self.pc);
+    fn fetch_byte(&mut self, cartridge: &Cartridge, ppu: &Ppu) -> u8 {
+        let byte = self.read_byte(cartridge, ppu, self.pc);
         self.pc += 1;
         byte
     }
 
-    fn fetch_word(&mut self) -> u16 {
-        let word = self.read_word(self.pc);
+    fn fetch_word(&mut self, cartridge: &Cartridge, ppu: &Ppu) -> u16 {
+        let word = self.read_word(cartridge, ppu, self.pc);
         self.pc += 2;
         word
     }
@@ -89,8 +91,8 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn ldx_immediate(&mut self) {
-        let operand = self.fetch_byte();
+    fn ldx_immediate(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
+        let operand = self.fetch_byte(cartridge, ppu);
         self.x = operand;
 
         self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
@@ -99,8 +101,8 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn ldy_immediate(&mut self) {
-        let operand = self.fetch_byte();
+    fn ldy_immediate(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
+        let operand = self.fetch_byte(cartridge, ppu);
         self.y = operand;
 
         self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
@@ -109,8 +111,8 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn lda_immediate(&mut self) {
-        let operand = self.fetch_byte();
+    fn lda_immediate(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
+        let operand = self.fetch_byte(cartridge, ppu);
         self.a = operand;
 
         self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
@@ -119,9 +121,9 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn lda_absolute_x(&mut self) {
-        let address = self.fetch_word();
-        let byte = self.read_byte(address + self.x as u16);
+    fn lda_absolute_x(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
+        let address = self.fetch_word(cartridge, ppu);
+        let byte = self.read_byte(cartridge, ppu, address + self.x as u16);
         self.a = byte;
 
         self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
@@ -130,9 +132,9 @@ impl Cpu {
         self.total_cycle += 4
     }
 
-    fn sta_absolute(&mut self) {
-        let address = self.fetch_word();
-        self.write_byte(address, self.a);
+    fn sta_absolute(&mut self, cartridge: &mut Cartridge, ppu: &mut Ppu) {
+        let address = self.fetch_word(cartridge, ppu);
+        self.write_byte(cartridge, ppu, address, self.a);
 
         self.total_cycle += 4
     }
@@ -155,8 +157,8 @@ impl Cpu {
         self.total_cycle += 2;
     }
 
-    fn bne(&mut self) {
-        let mut offset = self.fetch_byte();
+    fn bne(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
+        let mut offset = self.fetch_byte(cartridge, ppu);
 
         if self.status.zero == false {
             let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
@@ -174,8 +176,8 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn jmp_absolute(&mut self) {
-        let address = self.fetch_word();
+    fn jmp_absolute(&mut self, cartridge: &Cartridge, ppu: &Ppu) {
+        let address = self.fetch_word(cartridge, ppu);
         self.pc = address;
         self.total_cycle += 3
     }
@@ -186,18 +188,18 @@ impl Cpu {
         self.total_cycle += 2
     }
 
-    fn read_byte(&self, address: u16) -> u8 {
-        self.bus.read_byte(address)
+    fn read_byte(&self, cartridge: &Cartridge, ppu: &Ppu, address: u16) -> u8 {
+        self.bus.read_byte(cartridge, ppu, address)
     }
 
-    fn read_word(&self, address: u16) -> u16 {
-        let low = self.bus.read_byte(address) as u16;
-        let high = self.bus.read_byte(address + 1) as u16;
+    fn read_word(&self, cartridge: &Cartridge, ppu: &Ppu, address: u16) -> u16 {
+        let low = self.bus.read_byte(cartridge, ppu, address) as u16;
+        let high = self.bus.read_byte(cartridge, ppu, address + 1) as u16;
         (high << 8) | low
     }
 
-    fn write_byte(&mut self, address: u16, byte: u8) {
-        self.bus.write_byte(address, byte)
+    fn write_byte(&mut self, cartridge: &mut Cartridge, ppu: &mut Ppu, address: u16, byte: u8) {
+        self.bus.write_byte(cartridge, ppu, address, byte)
     }
 }
 
