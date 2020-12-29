@@ -1,31 +1,25 @@
 use crate::nes::cpu::Cpu;
-use crate::nes::cpu_bus::CpuBus;
-use crate::nes::ppu::Ppu;
 use crate::nes::cartridge::Cartridge;
+use crate::nes::cpu_bus::CpuBus;
 
 pub struct Emulator {
     cpu: Cpu,
-    ppu: Ppu,
-    cartridge: Cartridge
 }
 
 impl Emulator {
     pub fn new(cartridge: Cartridge) -> Emulator {
-        let cpu = Cpu::new(CpuBus::new());
-        let ppu = Ppu::new();
+        let cpu_bus = CpuBus::new(cartridge);
+        let cpu = Cpu::new(cpu_bus);
         Emulator {
-            cpu,
-            ppu,
-            cartridge
+            cpu
         }
     }
 
     pub fn start(&mut self) {
-        self.cpu.reset(&self.cartridge, &self.ppu);
+        self.cpu.reset();
         loop {
-            self.cpu.run_instruction(&mut self.cartridge, &mut self.ppu);
-            println!("{:?}", self.cpu);
-            self.ppu.run(&self.cartridge);
+            self.cpu.run_instruction();
+            println!("{:?}", self.cpu)
         }
     }
 }
