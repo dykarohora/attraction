@@ -3,9 +3,9 @@ pub struct Ram {
 }
 
 impl Ram {
-    pub fn new() -> Ram {
+    pub fn new(size:usize) -> Ram {
         Ram {
-            memory: vec![0; 2048]
+            memory: vec![0; size]
         }
     }
 
