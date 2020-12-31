@@ -1,15 +1,17 @@
+use std::cell::RefCell;
+
 pub struct Rom {
-    memory: Vec<u8>,
+    memory: RefCell<Vec<u8>>,
 }
 
 impl Rom {
     pub fn new(data: Vec<u8>) -> Rom {
         Rom {
-            memory: data
+            memory: RefCell::new(data)
         }
     }
 
     pub fn read(&self, address: u16) -> u8 {
-        self.memory[address as usize]
+        self.memory.borrow()[address as usize]
     }
 }

@@ -1,13 +1,14 @@
 use crate::nes::ram::Ram;
 use crate::nes::cartridge::Cartridge;
+use std::rc::Rc;
 
 pub struct CpuBus {
     wram: Ram,
-    cartridge: Cartridge,
+    cartridge: Rc<Cartridge>,
 }
 
 impl CpuBus {
-    pub fn new(cartridge: Cartridge) -> CpuBus {
+    pub fn new(cartridge: Rc<Cartridge>) -> CpuBus {
         CpuBus {
             wram: Ram::new(),
             cartridge,
