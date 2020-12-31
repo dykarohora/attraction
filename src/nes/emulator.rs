@@ -28,15 +28,15 @@ impl Emulator {
     pub fn start(&mut self) {
         self.cpu.reset();
         loop {
-            self.cpu.run_instruction();
-            self.ppu.run();
-            println!("{:?}", self.cpu);
-            // let mut number = String::new();
-            // std::io::stdin().read_line(&mut number).ok();
+            self.frame();
         }
     }
 
     pub fn frame(&mut self) {
-
+        let cycle = self.cpu.run_instruction();
+        self.ppu.run(cycle * 3);
+        // println!("{:?}", self.cpu);
+        // let mut number = String::new();
+        // std::io::stdin().read_line(&mut number).ok();
     }
 }

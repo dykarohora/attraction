@@ -24,8 +24,29 @@ impl Ppu {
         }
     }
 
-    pub fn run(&self) {
-        println!("Run ppu");
+    pub fn run(&self, cycle: u16) {
+        self.ppu_cycle_count.set(self.ppu_cycle_count.get() + cycle);
+
+        if self.ppu_cycle_count.get() >= 341 {
+            self.current_line.set(self.current_line.get() + 1);
+            self.ppu_cycle_count.set(self.ppu_cycle_count.get() % 341);
+
+            let current_line = self.current_line.get();
+
+            if current_line <= 240 && current_line % 8 == 0 {
+                let line_no = current_line/8;
+                println!("Draw background #{}", line_no);
+            }
+
+            if current_line == 241 {
+                println!("Set Vblank");
+            }
+
+            if current_line == 262 {
+                println!("Completed draw frame");
+                self.current_line.set(0);
+            }
+        }
     }
 
     pub fn read_ppu(&self, address: u16) -> u8 {

@@ -50,9 +50,9 @@ impl Cpu {
         self.pc = self.read_word(0xFFFC);
     }
 
-    pub fn run_instruction(&mut self) -> u8 {
+    pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        println!("opcode: {:#04X}", opcode);
+        // println!("opcode: {:#04X}", opcode);
         match opcode {
             0x4C => self.jmp_absolute(),
             0x78 => self.sei(),
@@ -81,13 +81,13 @@ impl Cpu {
         word
     }
 
-    fn sei(&mut self) -> u8 {
+    fn sei(&mut self) -> u16 {
         println!("SEI immediate");
         self.status.interrupt = true;
         2
     }
 
-    fn ldx_immediate(&mut self) -> u8 {
+    fn ldx_immediate(&mut self) -> u16 {
         let operand = self.fetch_byte();
         self.x = operand;
 
@@ -99,7 +99,7 @@ impl Cpu {
         2
     }
 
-    fn ldy_immediate(&mut self) -> u8 {
+    fn ldy_immediate(&mut self) -> u16 {
         let operand = self.fetch_byte();
         self.y = operand;
 
@@ -111,7 +111,7 @@ impl Cpu {
         2
     }
 
-    fn lda_immediate(&mut self) -> u8 {
+    fn lda_immediate(&mut self) -> u16 {
         let operand = self.fetch_byte();
         self.a = operand;
 
@@ -123,7 +123,7 @@ impl Cpu {
         2
     }
 
-    fn lda_absolute_x(&mut self) -> u8 {
+    fn lda_absolute_x(&mut self) -> u16 {
         let address = self.fetch_word();
         let byte = self.read_byte(address + self.x as u16);
         self.a = byte;
@@ -136,7 +136,7 @@ impl Cpu {
         4
     }
 
-    fn sta_absolute(&mut self) -> u8 {
+    fn sta_absolute(&mut self) -> u16 {
         let address = self.fetch_word();
         self.write_byte(address, self.a);
 
@@ -145,7 +145,7 @@ impl Cpu {
         4
     }
 
-    fn inx(&mut self) -> u8 {
+    fn inx(&mut self) -> u16 {
         println!("INX");
         self.x = self.x.wrapping_add(1);
 
@@ -155,7 +155,7 @@ impl Cpu {
         2
     }
 
-    fn dey(&mut self) -> u8 {
+    fn dey(&mut self) -> u16 {
         println!("DEY");
         self.y = self.y.wrapping_sub(1);
 
@@ -165,7 +165,7 @@ impl Cpu {
         2
     }
 
-    fn bne(&mut self) -> u8 {
+    fn bne(&mut self) -> u16 {
         let mut offset = self.fetch_byte();
         println!("BNE offset:{:#06X}", offset);
 
@@ -185,14 +185,14 @@ impl Cpu {
         2
     }
 
-    fn jmp_absolute(&mut self) -> u8 {
-        println!("JMP absolute");
+    fn jmp_absolute(&mut self) -> u16 {
+        // println!("JMP absolute");
         let address = self.fetch_word();
         self.pc = address;
         3
     }
 
-    fn txs(&mut self) -> u8 {
+    fn txs(&mut self) -> u16 {
         println!("TXS");
         self.sp = self.x;
 
