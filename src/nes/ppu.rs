@@ -6,6 +6,9 @@ pub struct Ppu {
     background_palette: RefCell<Vec<u8>>,
     ppu_addr: Cell<u16>,
     is_set_ppu_high_address: Cell<bool>,
+    graphic_buffer: RefCell<Vec<u32>>,
+    current_line: Cell<u16>,
+    ppu_cycle_count: Cell<u16>,
 }
 
 impl Ppu {
@@ -15,6 +18,9 @@ impl Ppu {
             background_palette: RefCell::new(vec![0; 16]),
             ppu_addr: Cell::new(0x0000),
             is_set_ppu_high_address: Cell::new(false),
+            graphic_buffer: RefCell::new(vec![0; 256 * 240]),
+            current_line: Cell::new(0),
+            ppu_cycle_count: Cell::new(0),
         }
     }
 

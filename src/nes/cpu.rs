@@ -9,7 +9,6 @@ pub struct Cpu {
     pc: u16,
     sp: u8,
     status: Status,
-    total_cycle: u64,
     bus: CpuBus,
 }
 
@@ -40,20 +39,18 @@ impl Cpu {
                 zero: false,
                 carry: false,
             },
-            total_cycle: 0,
             bus,
         }
     }
 
     pub fn reset(&mut self) {
-        self.total_cycle = 0;
         self.status.break_flg = true;
         self.status.interrupt = true;
         self.sp = 0xFD;
         self.pc = self.read_word(0xFFFC);
     }
 
-    pub fn run_instruction(&mut self) {
+    pub fn run_instruction(&mut self) -> u8 {
         let opcode = self.fetch_byte();
         println!("opcode: {:#04X}", opcode);
         match opcode {
@@ -84,13 +81,13 @@ impl Cpu {
         word
     }
 
-    fn sei(&mut self) {
+    fn sei(&mut self) -> u8 {
         println!("SEI immediate");
         self.status.interrupt = true;
-        self.total_cycle += 2
+        2
     }
 
-    fn ldx_immediate(&mut self) {
+    fn ldx_immediate(&mut self) -> u8 {
         let operand = self.fetch_byte();
         self.x = operand;
 
@@ -99,10 +96,10 @@ impl Cpu {
 
         println!("LDX immediate {:#06X}", self.x);
 
-        self.total_cycle += 2
+        2
     }
 
-    fn ldy_immediate(&mut self) {
+    fn ldy_immediate(&mut self) -> u8 {
         let operand = self.fetch_byte();
         self.y = operand;
 
@@ -111,10 +108,10 @@ impl Cpu {
 
         println!("LDY immediate {:#06X}", self.y);
 
-        self.total_cycle += 2
+        2
     }
 
-    fn lda_immediate(&mut self) {
+    fn lda_immediate(&mut self) -> u8 {
         let operand = self.fetch_byte();
         self.a = operand;
 
@@ -123,10 +120,10 @@ impl Cpu {
 
         println!("LDA immediate {:#06X}", self.a);
 
-        self.total_cycle += 2
+        2
     }
 
-    fn lda_absolute_x(&mut self) {
+    fn lda_absolute_x(&mut self) -> u8 {
         let address = self.fetch_word();
         let byte = self.read_byte(address + self.x as u16);
         self.a = byte;
@@ -136,39 +133,39 @@ impl Cpu {
 
         println!("LDA absolute {:#06X}", self.a);
 
-        self.total_cycle += 4
+        4
     }
 
-    fn sta_absolute(&mut self) {
+    fn sta_absolute(&mut self) -> u8 {
         let address = self.fetch_word();
         self.write_byte(address, self.a);
 
         println!("STA absolute address:{:#06X} register_a:{:#06X}", address, self.a);
 
-        self.total_cycle += 4
+        4
     }
 
-    fn inx(&mut self) {
+    fn inx(&mut self) -> u8 {
         println!("INX");
         self.x = self.x.wrapping_add(1);
 
         self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.x == 0 { true } else { false };
 
-        self.total_cycle += 2
+        2
     }
 
-    fn dey(&mut self) {
+    fn dey(&mut self) -> u8 {
         println!("DEY");
         self.y = self.y.wrapping_sub(1);
 
         self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.y == 0 { true } else { false };
 
-        self.total_cycle += 2;
+        2
     }
 
-    fn bne(&mut self) {
+    fn bne(&mut self) -> u8 {
         let mut offset = self.fetch_byte();
         println!("BNE offset:{:#06X}", offset);
 
@@ -185,21 +182,21 @@ impl Cpu {
             };
         }
 
-        self.total_cycle += 2
+        2
     }
 
-    fn jmp_absolute(&mut self) {
+    fn jmp_absolute(&mut self) -> u8 {
         println!("JMP absolute");
         let address = self.fetch_word();
         self.pc = address;
-        self.total_cycle += 3
+        3
     }
 
-    fn txs(&mut self) {
+    fn txs(&mut self) -> u8 {
         println!("TXS");
         self.sp = self.x;
 
-        self.total_cycle += 2
+        2
     }
 
     fn read_byte(&self, address: u16) -> u8 {

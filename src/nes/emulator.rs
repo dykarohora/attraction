@@ -35,4 +35,8 @@ impl Emulator {
             // std::io::stdin().read_line(&mut number).ok();
         }
     }
+
+    pub fn frame(&mut self) {
+
+    }
 }
