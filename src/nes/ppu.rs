@@ -1,12 +1,12 @@
 use crate::nes::ppu_bus::PpuBus;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, RefCell, Ref};
 
 pub struct Ppu {
     bus: RefCell<PpuBus>,
     background_palette: RefCell<Vec<u8>>,
     ppu_addr: Cell<u16>,
     is_set_ppu_high_address: Cell<bool>,
-    graphic_buffer: RefCell<Vec<u32>>,
+    graphic_buffer: RefCell<Vec<u8>>,
     current_line: Cell<u16>,
     ppu_cycle_count: Cell<u16>,
 }
@@ -34,8 +34,9 @@ impl Ppu {
             let current_line = self.current_line.get();
 
             if current_line <= 240 && current_line % 8 == 0 {
-                let line_no = current_line/8;
+                let line_no = current_line / 8 - 1;
                 println!("Draw background #{}", line_no);
+                self.build_background();
             }
 
             if current_line == 241 {
@@ -45,6 +46,81 @@ impl Ppu {
             if current_line == 262 {
                 println!("Completed draw frame");
                 self.current_line.set(0);
+            }
+        }
+    }
+
+    // 1タイルラインごとに書いていく
+    fn build_background(&self) {
+        let line_no = self.current_line.get() / 8 - 1;
+
+        // 1line = 256 pixel = 32 tile分 = ループ
+        for i in 0..32 {
+            let borrowed_bus = self.bus.borrow();
+            // ネームテーブルからスプライト番号を取得する
+            let sprite_num = borrowed_bus.read_byte((line_no * 32 + i) + 0x2000);
+            // キャラクタROMからスプライトデータを取得する
+            let mut sprite = Vec::<u8>::with_capacity(16);
+            for j in 0..16 {
+                let sprite_line = borrowed_bus.read_byte((sprite_num as u16 * 16) + j);
+                sprite.push(sprite_line);
+            }
+
+            // 属性テーブルからパレットを取り出す
+            // このタイルの属性テーブルの場所
+            let attribute_pos = (line_no / 4) * 8 + (i / 4);
+            // 属性テーブルからアトリビュート取り出す
+            let attribute = borrowed_bus.read_byte(attribute_pos + 0x23C0);
+
+            // タイルがブロックのうち、どこに該当するかを調べる
+            let block_id = match line_no % 4 {
+                0 | 1 => {
+                    match i % 4 {
+                        0 | 1 => 0,
+                        2 | 3 => 1,
+                        _ => panic!("invalid operation")
+                    }
+                }
+                2 | 3 => {
+                    match i % 4 {
+                        0 | 1 => 2,
+                        2 | 3 => 3,
+                        _ => panic!("invalid operation")
+                    }
+                }
+                _ => panic!("invalid operation")
+            };
+
+            // タイルのパレット番号を特定する
+            let palette = match block_id {
+                0 => (attribute & 0xC0) >> 6,
+                1 => (attribute & 0x30) >> 4,
+                2 => (attribute & 0x0C) >> 2,
+                3 => (attribute & 0x03),
+                _ => panic!("invalid operation")
+            };
+
+            // タイルピクセルに色情報をセットしていく
+            let mut tile = Vec::<u8>::with_capacity(8 * 8);
+            for j in 0..8 {
+                let sprite_low = sprite[j];
+                let sprite_high = sprite[j + 8];
+                for k in (0..8).rev() {
+                    let a = 0x01 << k;
+                    let l = (sprite_low & a) >> k;
+                    let h = ((sprite_high & a) >> k) * 2;
+                    let pixel = l + h;
+                    let pixel_color = self.background_palette.borrow()[(palette * 4 + pixel) as usize];
+                    tile.push(pixel_color);
+                }
+            }
+
+            let mut graphic_buffer_mut = self.graphic_buffer.borrow_mut();
+            for row in 0..8 {
+                for col in 0..8 {
+                    let pos = line_no * 2048 + i * 8 + row * 256 + col;
+                    graphic_buffer_mut[pos as usize] = tile[(row * 8 + col) as usize];
+                }
             }
         }
     }
@@ -76,6 +152,10 @@ impl Ppu {
             _ => panic!("[Ppu] invalid address: {:#06X}", address)
         };
         println!("[Ppu] Call write_ppu: address {:#06X}, byte {:#06X}", address, byte);
+    }
+
+    pub fn get_graphic_buffer(&self) -> Ref<Vec<u8>> {
+        self.graphic_buffer.borrow()
     }
 
     fn write_ppu_addr(&self, byte: u8) {

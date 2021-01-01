@@ -55,4 +55,8 @@ impl Cartridge {
             _ => panic!("[Cartridge] Not implemented or invalid address {:#010X}", address)
         }
     }
+
+    pub fn read_byte_from_character_rom(&self, address: u16) -> u8 {
+        self.character_rom.read(address)
+    }
 }
