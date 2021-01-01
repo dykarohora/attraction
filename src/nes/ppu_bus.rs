@@ -2,6 +2,7 @@ use crate::nes::ram::Ram;
 use crate::nes::cartridge::Cartridge;
 use std::rc::Rc;
 
+#[derive(Default, Debug)]
 pub struct PpuBus {
     vram: Ram,
     cartridge: Rc<Cartridge>,

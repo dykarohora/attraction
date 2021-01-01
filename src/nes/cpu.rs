@@ -2,6 +2,7 @@ use std::fmt;
 use crate::nes::cpu_bus::CpuBus;
 use std::fmt::Formatter;
 
+#[derive(Default)]
 pub struct Cpu {
     a: u8,
     x: u8,
@@ -12,6 +13,7 @@ pub struct Cpu {
     bus: CpuBus,
 }
 
+#[derive(Default, Debug)]
 struct Status {
     negative: bool,
     overflow: bool,
@@ -52,7 +54,7 @@ impl Cpu {
 
     pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        println!("opcode: {:#04X}", opcode);
+        // println!("opcode: {:#04X}", opcode);
         match opcode {
             0x4C => self.jmp_absolute(),
             0x78 => self.sei(),

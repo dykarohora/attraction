@@ -7,4 +7,4 @@ pub mod cpu_bus;
 pub mod ppu;
 pub mod ppu_bus;
 pub mod color;
-mod ppu_status_register;
+pub mod ppu_status_register;

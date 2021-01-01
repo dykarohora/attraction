@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 
+#[derive(Debug, Default)]
 pub struct Rom {
     memory: RefCell<Vec<u8>>,
 }

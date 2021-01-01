@@ -1,5 +1,6 @@
 use super::rom::Rom;
 
+#[derive(Debug, Default)]
 pub struct Cartridge {
     program_rom_page_size: u8,
     program_rom: Rom,

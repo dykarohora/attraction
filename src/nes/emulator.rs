@@ -5,13 +5,13 @@ use std::rc::Rc;
 use crate::nes::ppu::Ppu;
 use std::io::{Read, BufRead};
 use crate::nes::ppu_bus::PpuBus;
-use std::cell::Ref;
+use std::cell::{Ref, RefCell};
 
 
 pub struct Emulator {
     cpu: Cpu,
-    ppu: Rc<Ppu>,
-    cycle_count: u16
+    ppu: Rc<RefCell<Ppu>>,
+    cycle_count: u16,
 }
 
 impl Emulator {
@@ -19,13 +19,13 @@ impl Emulator {
         let cartridge_rc = Rc::new(cartridge);
         let ppu_bus = PpuBus::new(cartridge_rc.clone());
         let ppu = Ppu::new(ppu_bus);
-        let ppu_rc = Rc::new(ppu);
+        let ppu_rc = Rc::new(RefCell::new(ppu));
         let cpu_bus = CpuBus::new(ppu_rc.clone(), cartridge_rc.clone());
         let cpu = Cpu::new(cpu_bus);
         Emulator {
             cpu,
             ppu: ppu_rc,
-            cycle_count: 0
+            cycle_count: 0,
         }
     }
 
@@ -37,17 +37,17 @@ impl Emulator {
         loop {
             let cycle = self.cpu.run_instruction();
             self.cycle_count += cycle;
-            // self.ppu.run(cycle * 3);
+            self.ppu.borrow_mut().run(cycle * 3);
 
             if self.cycle_count >= 29781 {
                 self.cycle_count = self.cycle_count % 29781;
-                break
+                break;
             }
         }
         // println!("{:?}", self.cpu);
     }
 
-    pub fn get_graphic_buffer(&self) -> Ref<Vec<u32>> {
-        self.ppu.get_graphic_buffer()
+    pub fn get_graphic_buffer(&self) -> Vec<u32> {
+        self.ppu.borrow().get_graphic_buffer().clone()
     }
 }
