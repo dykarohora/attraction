@@ -39,10 +39,10 @@ fn main() {
 
     let mut last_display_time = Instant::now();
     let mut count: usize = 0;
-    while count < 20 {
+    while count < 40 {
         last_display_time = Instant::now();
         emulator.frame();
-        // window.update_with_buffer(&emulator.get_graphic_buffer(), width, height);
+        window.update_with_buffer(&emulator.get_graphic_buffer(), width, height);
         let duration_renderer = Instant::now() - last_display_time;
         println!("render duration {:?}", duration_renderer);
         count += 1;

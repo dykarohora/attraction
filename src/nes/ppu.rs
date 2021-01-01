@@ -54,13 +54,15 @@ impl Ppu {
         let borrowed_bus = self.bus.borrow();
         let borrowed_background_palette = self.background_palette.borrow();
         let mut graphic_buffer_mut = self.graphic_buffer.borrow_mut();
+        let mut sprite = Vec::<u8>::with_capacity(16);
+        let mut tile = Vec::<u8>::with_capacity(8 * 8);
 
         for i in 0..32 {
             // ネームテーブルからスプライト番号を取得する
             let sprite_num = borrowed_bus.read_byte((line_no * 32 + i) + 0x2000);
             // キャラクタROMからスプライトデータを取得する
-            let mut sprite = Vec::<u8>::with_capacity(16);
 
+            sprite.clear();
             for j in 0..16 {
                 let sprite_line = borrowed_bus.read_byte((sprite_num as u16 * 16) + j);
                 sprite.push(sprite_line);
@@ -102,7 +104,7 @@ impl Ppu {
             };
 
             // タイルピクセルに色情報をセットしていく
-            let mut tile = Vec::<u8>::with_capacity(8 * 8);
+            tile.clear();
             for j in 0..8 {
                 let sprite_low = sprite[j];
                 let sprite_high = sprite[j + 8];
