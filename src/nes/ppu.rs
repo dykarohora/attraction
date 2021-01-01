@@ -1,15 +1,20 @@
 use crate::nes::ppu_bus::PpuBus;
 use std::cell::{Cell, RefCell, Ref};
 use crate::nes::color::COLOR;
+use crate::nes::ppu_status_register::PpuStatusRegister;
 
 pub struct Ppu {
     bus: RefCell<PpuBus>,
     background_palette: RefCell<Vec<u8>>,
+
+    status_register: PpuStatusRegister,
+
     ppu_addr: Cell<u16>,
     is_set_ppu_high_address: Cell<bool>,
-    graphic_buffer: RefCell<Vec<u32>>,
     current_line: Cell<u16>,
     ppu_cycle_count: Cell<u16>,
+
+    graphic_buffer: RefCell<Vec<u32>>,
 }
 
 impl Ppu {
@@ -22,6 +27,8 @@ impl Ppu {
             graphic_buffer: RefCell::new(vec![0; 256 * 240]),
             current_line: Cell::new(0),
             ppu_cycle_count: Cell::new(0),
+
+            ..Default::default()
         }
     }
 
@@ -38,7 +45,8 @@ impl Ppu {
                 self.build_background();
             }
 
-            if current_line == 241 {}
+            if current_line == 241 {
+            }
 
             if current_line == 262 {
                 self.current_line.set(0);

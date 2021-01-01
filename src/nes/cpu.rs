@@ -52,7 +52,7 @@ impl Cpu {
 
     pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        // println!("opcode: {:#04X}", opcode);
+        println!("opcode: {:#04X}", opcode);
         match opcode {
             0x4C => self.jmp_absolute(),
             0x78 => self.sei(),
@@ -62,6 +62,7 @@ impl Cpu {
             0xA0 => self.ldy_immediate(),
             0xA2 => self.ldx_immediate(),
             0xA9 => self.lda_immediate(),
+            0xAD => self.lda_absolute(),
             0xBD => self.lda_absolute_x(),
             0xD0 => self.bne(),
             0xE8 => self.inx(),
@@ -120,6 +121,17 @@ impl Cpu {
         // println!("LDA immediate {:#06X}", self.a);
 
         2
+    }
+
+    fn lda_absolute(&mut self) -> u16 {
+        let address = self.fetch_word();
+        let byte = self.read_byte(address);
+        self.a = byte;
+
+        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.a == 0 { true } else { false };
+
+        4
     }
 
     fn lda_absolute_x(&mut self) -> u16 {

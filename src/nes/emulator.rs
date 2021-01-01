@@ -37,7 +37,7 @@ impl Emulator {
         loop {
             let cycle = self.cpu.run_instruction();
             self.cycle_count += cycle;
-            self.ppu.run(cycle * 3);
+            // self.ppu.run(cycle * 3);
 
             if self.cycle_count >= 29781 {
                 self.cycle_count = self.cycle_count % 29781;
