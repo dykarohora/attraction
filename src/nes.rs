@@ -5,4 +5,5 @@ pub mod rom;
 pub mod cartridge;
 pub mod cpu_bus;
 pub mod ppu;
-mod ppu_bus;
+pub mod ppu_bus;
+pub mod color;

@@ -5,10 +5,13 @@ use std::rc::Rc;
 use crate::nes::ppu::Ppu;
 use std::io::{Read, BufRead};
 use crate::nes::ppu_bus::PpuBus;
+use std::cell::Ref;
+
 
 pub struct Emulator {
     cpu: Cpu,
     ppu: Rc<Ppu>,
+    cycle_count: u16
 }
 
 impl Emulator {
@@ -22,21 +25,29 @@ impl Emulator {
         Emulator {
             cpu,
             ppu: ppu_rc,
+            cycle_count: 0
         }
     }
 
     pub fn start(&mut self) {
         self.cpu.reset();
-        loop {
-            self.frame();
-        }
     }
 
     pub fn frame(&mut self) {
-        let cycle = self.cpu.run_instruction();
-        self.ppu.run(cycle * 3);
+        loop {
+            let cycle = self.cpu.run_instruction();
+            self.cycle_count += cycle;
+            self.ppu.run(cycle * 3);
+
+            if self.cycle_count >= 29781 {
+                self.cycle_count = self.cycle_count % 29781;
+                break
+            }
+        }
         // println!("{:?}", self.cpu);
-        // let mut number = String::new();
-        // std::io::stdin().read_line(&mut number).ok();
+    }
+
+    pub fn get_graphic_buffer(&self) -> Ref<Vec<u8>> {
+        self.ppu.get_graphic_buffer()
     }
 }

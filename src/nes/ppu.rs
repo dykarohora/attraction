@@ -34,17 +34,12 @@ impl Ppu {
             let current_line = self.current_line.get();
 
             if current_line <= 240 && current_line % 8 == 0 {
-                let line_no = current_line / 8 - 1;
-                println!("Draw background #{}", line_no);
                 self.build_background();
             }
 
-            if current_line == 241 {
-                println!("Set Vblank");
-            }
+            if current_line == 241 {}
 
             if current_line == 262 {
-                println!("Completed draw frame");
                 self.current_line.set(0);
             }
         }
@@ -55,8 +50,9 @@ impl Ppu {
         let line_no = self.current_line.get() / 8 - 1;
 
         // 1line = 256 pixel = 32 tile分 = ループ
+        let borrowed_bus = self.bus.borrow();
+        let mut graphic_buffer_mut = self.graphic_buffer.borrow_mut();
         for i in 0..32 {
-            let borrowed_bus = self.bus.borrow();
             // ネームテーブルからスプライト番号を取得する
             let sprite_num = borrowed_bus.read_byte((line_no * 32 + i) + 0x2000);
             // キャラクタROMからスプライトデータを取得する
@@ -115,7 +111,6 @@ impl Ppu {
                 }
             }
 
-            let mut graphic_buffer_mut = self.graphic_buffer.borrow_mut();
             for row in 0..8 {
                 for col in 0..8 {
                     let pos = line_no * 2048 + i * 8 + row * 256 + col;
@@ -151,7 +146,7 @@ impl Ppu {
             0x2007 => self.write_ppu_data(byte),
             _ => panic!("[Ppu] invalid address: {:#06X}", address)
         };
-        println!("[Ppu] Call write_ppu: address {:#06X}, byte {:#06X}", address, byte);
+        // println!("[Ppu] Call write_ppu: address {:#06X}, byte {:#06X}", address, byte);
     }
 
     pub fn get_graphic_buffer(&self) -> Ref<Vec<u8>> {
@@ -163,7 +158,7 @@ impl Ppu {
             let address = self.ppu_addr.get();
             self.ppu_addr.set((address | (byte as u16)));
             self.is_set_ppu_high_address.set(false);
-            println!("[PPU] PPU address set: {:#06X}", self.ppu_addr.get());
+            // println!("[PPU] PPU address set: {:#06X}", self.ppu_addr.get());
         } else {
             self.ppu_addr.set((byte as u16) << 8);
             self.is_set_ppu_high_address.set(true);
