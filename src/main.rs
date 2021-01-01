@@ -24,7 +24,7 @@ fn main() {
 
     let width = 256;
     let height = 240;
-    let mut window_buffer: Vec<u32> = vec![0; width * height];
+    // let mut window_buffer: Vec<u32> = vec![0; width * height];
     let mut window = Window::new(
         "ATTRACTION",
         width,
@@ -39,19 +39,10 @@ fn main() {
 
     let mut last_display_time = Instant::now();
     let mut count: usize = 0;
-    while count < 10 {
+    while count < 20 {
         last_display_time = Instant::now();
         emulator.frame();
-        let duration_emu = Instant::now() - last_display_time;
-        println!("frame duration {:?}", duration_emu);
-
-        last_display_time = Instant::now();
-        let graphic_buffer = emulator.get_graphic_buffer();
-        for i in 0..(width*height) {
-            let pixel = graphic_buffer[i];
-            window_buffer[i] = COLOR[pixel as usize];
-        }
-        window.update_with_buffer(&window_buffer, width, height);
+        // window.update_with_buffer(&emulator.get_graphic_buffer(), width, height);
         let duration_renderer = Instant::now() - last_display_time;
         println!("render duration {:?}", duration_renderer);
         count += 1;

@@ -47,7 +47,7 @@ impl Emulator {
         // println!("{:?}", self.cpu);
     }
 
-    pub fn get_graphic_buffer(&self) -> Ref<Vec<u8>> {
+    pub fn get_graphic_buffer(&self) -> Ref<Vec<u32>> {
         self.ppu.get_graphic_buffer()
     }
 }

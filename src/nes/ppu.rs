@@ -1,12 +1,13 @@
 use crate::nes::ppu_bus::PpuBus;
 use std::cell::{Cell, RefCell, Ref};
+use crate::nes::color::COLOR;
 
 pub struct Ppu {
     bus: RefCell<PpuBus>,
     background_palette: RefCell<Vec<u8>>,
     ppu_addr: Cell<u16>,
     is_set_ppu_high_address: Cell<bool>,
-    graphic_buffer: RefCell<Vec<u8>>,
+    graphic_buffer: RefCell<Vec<u32>>,
     current_line: Cell<u16>,
     ppu_cycle_count: Cell<u16>,
 }
@@ -51,12 +52,15 @@ impl Ppu {
 
         // 1line = 256 pixel = 32 tile分 = ループ
         let borrowed_bus = self.bus.borrow();
+        let borrowed_background_palette = self.background_palette.borrow();
         let mut graphic_buffer_mut = self.graphic_buffer.borrow_mut();
+
         for i in 0..32 {
             // ネームテーブルからスプライト番号を取得する
             let sprite_num = borrowed_bus.read_byte((line_no * 32 + i) + 0x2000);
             // キャラクタROMからスプライトデータを取得する
             let mut sprite = Vec::<u8>::with_capacity(16);
+
             for j in 0..16 {
                 let sprite_line = borrowed_bus.read_byte((sprite_num as u16 * 16) + j);
                 sprite.push(sprite_line);
@@ -64,6 +68,7 @@ impl Ppu {
 
             // 属性テーブルからパレットを取り出す
             // このタイルの属性テーブルの場所
+            // TODO ここ結構無駄
             let attribute_pos = (line_no / 4) * 8 + (i / 4);
             // 属性テーブルからアトリビュート取り出す
             let attribute = borrowed_bus.read_byte(attribute_pos + 0x23C0);
@@ -106,7 +111,7 @@ impl Ppu {
                     let l = (sprite_low & a) >> k;
                     let h = ((sprite_high & a) >> k) * 2;
                     let pixel = l + h;
-                    let pixel_color = self.background_palette.borrow()[(palette * 4 + pixel) as usize];
+                    let pixel_color = borrowed_background_palette[(palette * 4 + pixel) as usize];
                     tile.push(pixel_color);
                 }
             }
@@ -114,7 +119,8 @@ impl Ppu {
             for row in 0..8 {
                 for col in 0..8 {
                     let pos = line_no * 2048 + i * 8 + row * 256 + col;
-                    graphic_buffer_mut[pos as usize] = tile[(row * 8 + col) as usize];
+                    let pixel = tile[(row * 8 + col) as usize];
+                    graphic_buffer_mut[pos as usize] = COLOR[pixel as usize];
                 }
             }
         }
@@ -149,7 +155,7 @@ impl Ppu {
         // println!("[Ppu] Call write_ppu: address {:#06X}, byte {:#06X}", address, byte);
     }
 
-    pub fn get_graphic_buffer(&self) -> Ref<Vec<u8>> {
+    pub fn get_graphic_buffer(&self) -> Ref<Vec<u32>> {
         self.graphic_buffer.borrow()
     }
 
