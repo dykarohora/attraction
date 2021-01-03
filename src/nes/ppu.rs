@@ -36,12 +36,42 @@ impl PpuCtrlRegister {
 }
 
 #[derive(Default, Debug)]
+pub struct PpuMaskRegister {
+    background_color: u8,
+    enable_sprite: bool,
+    enable_background: bool,
+    enable_sprite_mask: bool,
+    enable_background_mask: bool,
+    enable_monochrome_display: bool,
+}
+
+impl PpuMaskRegister {
+    pub fn set_binary(&mut self, byte: u8) {
+        self.background_color = match (byte & 0b1110_0000) >> 5 {
+            0b000 => 0b000,
+            0b001 => 0b001,
+            0b010 => 0b010,
+            0b100 => 0b100,
+            _ => panic!("invalid operation")
+        };
+
+        self.enable_sprite = if byte & 0b0001_0000 == 0b0001_0000 { true } else { false };
+        self.enable_background = if byte & 0b0000_1000 == 0b0000_1000 { true } else { false };
+        self.enable_sprite_mask = if byte & 0b0000_0100 == 0b0000_0100 { true } else { false };
+        self.enable_background_mask = if byte & 0b0000_0010 == 0b0000_0010 { true } else { false };
+        self.enable_monochrome_display = if byte & 0b0000_0001 == 0b0000_0001 { true } else { false };
+    }
+}
+
+
+#[derive(Default, Debug)]
 pub struct Ppu {
     bus: PpuBus,
     background_palette: Vec<u8>,
 
     status_register: PpuStatusRegister,
     ctrl_register: PpuCtrlRegister,
+    mask_register: PpuMaskRegister,
 
     ppu_addr: u16,
     is_set_ppu_high_address: bool,
@@ -63,6 +93,7 @@ impl Ppu {
             ppu_cycle_count: 0,
             status_register: Default::default(),
             ctrl_register: Default::default(),
+            mask_register: Default::default(),
         }
     }
 
@@ -187,7 +218,7 @@ impl Ppu {
     pub fn write_ppu(&mut self, address: u16, byte: u8) {
         match address {
             0x2000 => self.ctrl_register.set_binary(byte),
-            0x2001 => (),
+            0x2001 => self.mask_register.set_binary(byte),
             0x2002 => (),
             0x2003 => (),
             0x2004 => (),

@@ -100,7 +100,7 @@ impl Cpu {
         self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.x == 0 { true } else { false };
 
-        // println!("LDX immediate {:#06X}", self.x);
+        print!("LDX immediate {:#06X}", self.x);
         2
     }
 
@@ -147,7 +147,7 @@ impl Cpu {
         self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.a == 0 { true } else { false };
 
-        // println!("LDA absolute {:#06X}", self.a);
+        print!("LDA absolute {:#06X}", self.a);
         4
     }
 
@@ -160,7 +160,7 @@ impl Cpu {
     }
 
     fn inx(&mut self) -> u16 {
-        // println!("INX");
+        print!("INX");
         self.x = self.x.wrapping_add(1);
 
         self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
@@ -170,7 +170,7 @@ impl Cpu {
     }
 
     fn dey(&mut self) -> u16 {
-        // println!("DEY");
+        print!("DEY");
         self.y = self.y.wrapping_sub(1);
 
         self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
