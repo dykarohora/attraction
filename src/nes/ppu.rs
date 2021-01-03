@@ -143,7 +143,7 @@ impl Ppu {
         match address {
             0x2000 => 0,
             0x2001 => 1,
-            0x2002 => 2,
+            0x2002 => self.read_ppu_status(),
             0x2003 => 3,
             0x2004 => 4,
             0x2005 => 5,
@@ -200,6 +200,10 @@ impl Ppu {
         // PPUDATAに書き込みが発生するとPPUADDRがインクリメントされる
         // self.ppu_addr.set(ppu_address + 1);
         self.ppu_addr += 1;
+    }
+
+    fn read_ppu_status(&self) -> u8 {
+        self.status_register.get_binary()
     }
 
     // バックグラウンドパレットへの書き込み

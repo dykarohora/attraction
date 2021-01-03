@@ -54,8 +54,9 @@ impl Cpu {
 
     pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        // println!("opcode: {:#04X}", opcode);
+        println!("opcode: {:#04X}", opcode);
         match opcode {
+            0x10 => self.bpl(),
             0x4C => self.jmp_absolute(),
             0x78 => self.sei(),
             0x88 => self.dey(),
@@ -145,7 +146,6 @@ impl Cpu {
         self.status.zero = if self.a == 0 { true } else { false };
 
         // println!("LDA absolute {:#06X}", self.a);
-
         4
     }
 
@@ -154,7 +154,6 @@ impl Cpu {
         self.write_byte(address, self.a);
 
         // println!("STA absolute address:{:#06X} register_a:{:#06X}", address, self.a);
-
         4
     }
 
@@ -174,6 +173,24 @@ impl Cpu {
 
         self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.y == 0 { true } else { false };
+
+        2
+    }
+
+    fn bpl(&mut self) -> u16 {
+        let mut offset = self.fetch_byte();
+
+        if self.status.negative == false {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            }
+        }
 
         2
     }

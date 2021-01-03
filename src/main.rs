@@ -39,7 +39,7 @@ fn main() {
 
     let mut last_display_time = Instant::now();
     let mut count: usize = 0;
-    while count < 40 {
+    while count < 600 {
         last_display_time = Instant::now();
         emulator.frame();
         window.update_with_buffer(&emulator.get_graphic_buffer(), width, height);
