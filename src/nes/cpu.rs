@@ -54,8 +54,8 @@ impl Cpu {
 
     pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        println!("opcode: {:#04X}", opcode);
-        match opcode {
+        print!("opcode: {:#04X} ", opcode);
+        let cycle = match opcode {
             0x10 => self.bpl(),
             0x4C => self.jmp_absolute(),
             0x78 => self.sei(),
@@ -70,7 +70,9 @@ impl Cpu {
             0xD0 => self.bne(),
             0xE8 => self.inx(),
             _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
-        }
+        };
+        println!();
+        cycle
     }
 
     fn fetch_byte(&mut self) -> u8 {
@@ -121,7 +123,7 @@ impl Cpu {
         self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.a == 0 { true } else { false };
 
-        // println!("LDA immediate {:#06X}", self.a);
+        print!("LDA immediate {:#06X}", self.a);
 
         2
     }
@@ -153,7 +155,7 @@ impl Cpu {
         let address = self.fetch_word();
         self.write_byte(address, self.a);
 
-        // println!("STA absolute address:{:#06X} register_a:{:#06X}", address, self.a);
+        print!("STA absolute address:{:#06X} register_a:{:#06X}", address, self.a);
         4
     }
 

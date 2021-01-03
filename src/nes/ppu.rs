@@ -3,12 +3,45 @@ use std::cell::{Cell, RefCell, Ref};
 use crate::nes::color::COLOR;
 use crate::nes::ppu_status_register::PpuStatusRegister;
 
+#[derive(Debug, Default)]
+pub struct PpuCtrlRegister {
+    is_generate_nmi_when_vblank: bool,
+    is_slave: bool,
+    is_high_sprite: bool,
+    base_background_pattern_address: u16,
+    base_sprite_pattern_address: u16,
+    ppu_address_inc_size: u8,
+    base_name_table_address: u16,
+}
+
+impl PpuCtrlRegister {
+    pub fn set_binary(&mut self, byte: u8) {
+        self.is_generate_nmi_when_vblank = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
+        self.is_slave = if byte & 0b0100_0000 == 0b0100_0000 { true } else { false };
+        self.is_high_sprite = if byte & 0b0010_0000 == 0b0010_0000 { true } else { false };
+
+        self.base_background_pattern_address = if byte & 0b0001_0000 == 0b0001_0000 { 0x1000 } else { 0x0000 };
+        self.base_sprite_pattern_address = if byte & 0b0000_1000 == 0b0000_1000 { 0x1000 } else { 0x0000 };
+        self.ppu_address_inc_size = if byte & 0b0000_0100 == 0b0000_0100 { 32 } else { 1 };
+        self.is_generate_nmi_when_vblank = if byte & 0b0000_0011 == 0b0000_0010 { true } else { false };
+
+        self.base_name_table_address = match byte & 0b0000_0011 {
+            0b00 => { 0x2000 }
+            0b01 => { 0x2400 }
+            0b10 => { 0x2800 }
+            0b11 => { 0x2C00 }
+            _ => panic!("invalid operation")
+        }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct Ppu {
     bus: PpuBus,
     background_palette: Vec<u8>,
 
     status_register: PpuStatusRegister,
+    ctrl_register: PpuCtrlRegister,
 
     ppu_addr: u16,
     is_set_ppu_high_address: bool,
@@ -29,6 +62,7 @@ impl Ppu {
             current_line: 0,
             ppu_cycle_count: 0,
             status_register: Default::default(),
+            ctrl_register: Default::default(),
         }
     }
 
@@ -47,10 +81,13 @@ impl Ppu {
                 self.build_background();
             }
 
-            if self.current_line == 241 {}
+            if self.current_line == 241 {
+                self.status_register.set_vblank();
+            }
 
             if self.current_line == 262 {
                 // self.current_line.set(0);
+                self.status_register.clear_vblank();
                 self.current_line = 0
             }
         }
@@ -59,12 +96,6 @@ impl Ppu {
     // 1タイルラインごとに書いていく
     fn build_background(&mut self) {
         let line_no = self.current_line / 8 - 1;
-
-        // 1line = 256 pixel = 32 tile分 = ループ
-        // let borrowed_bus = self.bus.borrow();
-        // let borrowed_background_palette = self.background_palette.borrow();
-        // let mut graphic_buffer_mut = self.graphic_buffer.borrow_mut();
-
         let mut sprite = Vec::<u8>::with_capacity(16);
         let mut tile = Vec::<u8>::with_capacity(8 * 8);
 
@@ -155,7 +186,7 @@ impl Ppu {
 
     pub fn write_ppu(&mut self, address: u16, byte: u8) {
         match address {
-            0x2000 => (),
+            0x2000 => self.ctrl_register.set_binary(byte),
             0x2001 => (),
             0x2002 => (),
             0x2003 => (),
