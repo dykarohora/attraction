@@ -68,6 +68,7 @@ impl Cpu {
             0xAD => self.lda_absolute(),
             0xBD => self.lda_absolute_x(),
             0xD0 => self.bne(),
+            0xE0 => self.cpx_immediate(),
             0xE8 => self.inx(),
             _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
         };
@@ -217,7 +218,14 @@ impl Cpu {
         2
     }
 
-    // #[inline]
+    fn cpx_immediate(&mut self) -> u16 {
+        let operand = self.fetch_byte();
+
+        print!("CPX compare X:{:#06X} to operand:{:#06X}", self.x, operand);
+
+        2
+    }
+
     fn jmp_absolute(&mut self) -> u16 {
         // println!("JMP absolute");
         let address = self.fetch_word();
