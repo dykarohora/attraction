@@ -200,7 +200,7 @@ impl Cpu {
 
     fn bne(&mut self) -> u16 {
         let mut offset = self.fetch_byte();
-        // println!("BNE offset:{:#06X}", offset);
+        print!("BNE offset:{:#06X}", offset);
 
         if self.status.zero == false {
             let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
@@ -222,6 +222,18 @@ impl Cpu {
         let operand = self.fetch_byte();
 
         print!("CPX compare X:{:#06X} to operand:{:#06X}", self.x, operand);
+
+        let result = self.x as i8 - operand as i8;
+
+        self.status.zero = if result == 0 { true } else { false };
+
+        if result >= 0 {
+            self.status.negative = false;
+            self.status.carry = true;
+        } else {
+            self.status.negative = true;
+            self.status.carry = false;
+        };
 
         2
     }
