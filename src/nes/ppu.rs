@@ -68,12 +68,15 @@ impl PpuMaskRegister {
 pub struct Ppu {
     bus: PpuBus,
     background_palette: Vec<u8>,
+    sprite_palette: Vec<u8>,
+    sprite_ram: Vec<u8>,
 
     status_register: PpuStatusRegister,
     ctrl_register: PpuCtrlRegister,
     mask_register: PpuMaskRegister,
 
     ppu_addr: u16,
+    sprite_ram_addr: u8,
     is_set_ppu_high_address: bool,
     current_line: u16,
     ppu_cycle_count: u16,
@@ -86,7 +89,10 @@ impl Ppu {
         Ppu {
             bus: ppu_bus,
             background_palette: vec![0; 16],
+            sprite_palette: vec![0; 16],
+            sprite_ram: vec![0; 256],
             ppu_addr: 0x0000,
+            sprite_ram_addr: 0x00,
             is_set_ppu_high_address: false,
             graphic_buffer: vec![0; 256 * 240],
             current_line: 0,
@@ -203,15 +209,15 @@ impl Ppu {
 
     pub fn read_ppu(&self, address: u16) -> u8 {
         match address {
-            0x2000 => 0,
-            0x2001 => 1,
+            0x2000 => panic!("[PPU] not implemented read 0x2000"),
+            0x2001 => panic!("[PPU] not implemented read 0x2001"),
             0x2002 => self.read_ppu_status(),
-            0x2003 => 3,
-            0x2004 => 4,
-            0x2005 => 5,
-            0x2006 => 6,
-            0x2007 => 7,
-            _ => panic!("[Ppu] invalid address: {:#06X}", address)
+            0x2003 => panic!("[PPU] not implemented read 0x2002"),
+            0x2004 => panic!("[PPU] not implemented read 0x2003"),
+            0x2005 => panic!("[PPU] not implemented read 0x2004"),
+            0x2006 => panic!("[PPU] not implemented read 0x2005"),
+            0x2007 => panic!("[PPU] not implemented read 0x2006"),
+            _ => panic!("[PPU] invalid address: {:#06X}", address)
         }
     }
 
@@ -219,13 +225,13 @@ impl Ppu {
         match address {
             0x2000 => self.ctrl_register.set_binary(byte),
             0x2001 => self.mask_register.set_binary(byte),
-            0x2002 => (),
-            0x2003 => (),
-            0x2004 => (),
-            0x2005 => (),
+            0x2002 => panic!("[PPU] not implemented write 0x2002 byte:{:#04X}", byte),
+            0x2003 => self.write_sprite_addr(byte),
+            0x2004 => self.write_sprite_data(byte),
+            0x2005 => panic!("[PPU] not implemented write 0x2005 byte:{:#04X}", byte),
             0x2006 => self.write_ppu_addr(byte),
             0x2007 => self.write_ppu_data(byte),
-            _ => panic!("[Ppu] invalid address: {:#06X}", address)
+            _ => panic!("[PPU] invalid address: {:#06X}", address)
         };
         // println!("[Ppu] Call write_ppu: address {:#06X}, byte {:#06X}", address, byte);
     }
@@ -234,33 +240,35 @@ impl Ppu {
         &self.graphic_buffer
     }
 
+    fn write_sprite_addr(&mut self, byte: u8) {
+        self.sprite_ram_addr = byte;
+    }
+
+    fn write_sprite_data(&mut self, byte: u8) {
+        self.sprite_ram[self.sprite_ram_addr as usize] = byte;
+        self.sprite_ram_addr += 1;
+    }
+
     fn write_ppu_addr(&mut self, byte: u8) {
         if self.is_set_ppu_high_address {
-            // let address = self.ppu_addr.get();
-            // self.ppu_addr.set((address | (byte as u16)));
             self.ppu_addr = self.ppu_addr | (byte as u16);
-
-            // self.is_set_ppu_high_address.set(false);
             self.is_set_ppu_high_address = false
             // println!("[PPU] PPU address set: {:#06X}", self.ppu_addr.get());
         } else {
-            // self.ppu_addr.set((byte as u16) << 8);
             self.ppu_addr = (byte as u16) << 8;
-            // self.is_set_ppu_high_address.set(true);
             self.is_set_ppu_high_address = true
         }
     }
 
     fn write_ppu_data(&mut self, byte: u8) {
         // PPU ADDRによって
-        // let ppu_address = self.ppu_addr.get();
         match self.ppu_addr {
             0x2000..=0x23FF => self.bus.write_byte(self.ppu_addr, byte),
             0x3F00..=0x3F0F => self.write_background_palette(self.ppu_addr, byte),
+            0x3F10..=0x3F1F => self.write_sprite_palette(self.ppu_addr, byte),
             _ => panic!("[Ppu] not implemented or invalid address: {:#06X} byte: {:#04X}", self.ppu_addr, byte)
-        }
+        };
         // PPUDATAに書き込みが発生するとPPUADDRがインクリメントされる
-        // self.ppu_addr.set(ppu_address + 1);
         self.ppu_addr += 1;
     }
 
@@ -271,5 +279,9 @@ impl Ppu {
     // バックグラウンドパレットへの書き込み
     fn write_background_palette(&mut self, address: u16, byte: u8) {
         self.background_palette[(address - 0x3F00) as usize] = byte;
+    }
+
+    fn write_sprite_palette(&mut self, address: u16, byte: u8) {
+        self.sprite_palette[(address - 0x3F10) as usize] = byte
     }
 }

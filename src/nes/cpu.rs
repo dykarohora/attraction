@@ -54,7 +54,10 @@ impl Cpu {
 
     pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        print!("opcode: {:#04X} ", opcode);
+        if opcode != 0x4C {
+            print!("opcode: {:#04X} ", opcode);
+        };
+
         let cycle = match opcode {
             0x10 => self.bpl(),
             0x4C => self.jmp_absolute(),
@@ -72,7 +75,10 @@ impl Cpu {
             0xE8 => self.inx(),
             _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
         };
-        println!();
+
+        if opcode != 0x4C {
+            println!();
+        };
         cycle
     }
 
