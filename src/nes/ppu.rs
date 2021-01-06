@@ -106,27 +106,31 @@ impl Ppu {
     pub fn run(&mut self, cycle: u16) {
         self.ppu_cycle_count += cycle;
 
-        if self.ppu_cycle_count >= 341 {
-            // self.current_line.set(self.current_line.get() + 1);
-            self.current_line += 1;
-            // self.ppu_cycle_count.set(self.ppu_cycle_count.get() % 341);
-            self.ppu_cycle_count %= 341;
+        if self.ppu_cycle_count < 341 {
+            return;
+        }
 
-            // let current_line = self.current_line.get();
+        self.current_line += 1;
+        self.ppu_cycle_count %= 341;
 
-            if self.current_line <= 240 && self.current_line % 8 == 0 {
-                self.build_background();
-            }
+        if self.mask_register.enable_background && self.current_line <= 240 && self.current_line % 8 == 0 {
+            self.build_background();
+        }
 
-            if self.current_line == 241 {
-                self.status_register.set_vblank();
-            }
+        if self.mask_register.enable_sprite && self.current_line == 240 {
+            self.build_sprites();
+            return;
+        }
 
-            if self.current_line == 262 {
-                // self.current_line.set(0);
-                self.status_register.clear_vblank();
-                self.current_line = 0
-            }
+        if self.current_line == 241 {
+            self.status_register.set_vblank();
+            return;
+        }
+
+        if self.current_line == 262 {
+            self.status_register.clear_vblank();
+            self.current_line = 0;
+            return;
         }
     }
 
@@ -138,12 +142,12 @@ impl Ppu {
 
         for i in 0..32 {
             // ネームテーブルからスプライト番号を取得する
-            let sprite_num = self.bus.read_byte((line_no * 32 + i) + 0x2000);
+            let sprite_index = self.bus.read_byte((line_no * 32 + i) + 0x2000);
             // キャラクタROMからスプライトデータを取得する
 
             sprite.clear();
             for j in 0..16 {
-                let sprite_line = self.bus.read_byte((sprite_num as u16 * 16) + j);
+                let sprite_line = self.bus.read_byte((sprite_index as u16 * 16) + j + self.ctrl_register.base_background_pattern_address);
                 sprite.push(sprite_line);
             }
 
@@ -200,6 +204,63 @@ impl Ppu {
             for row in 0..8 {
                 for col in 0..8 {
                     let pos = line_no * 2048 + i * 8 + row * 256 + col;
+                    let pixel = tile[(row * 8 + col) as usize];
+                    self.graphic_buffer[pos as usize] = COLOR[pixel as usize];
+                }
+            }
+        }
+    }
+
+    fn build_sprites(&mut self) {
+        let mut sprite = Vec::<u8>::with_capacity(16);
+        let mut tile = Vec::<u8>::with_capacity(8*8);
+
+        for i in 0..64 {
+            // スプライトRAMから4バイトデータを読み出す
+            let pos_y = (self.sprite_ram[i * 4] as i8) - 1;
+            if pos_y < 0 {
+                continue;
+            }
+
+            let sprite_index = self.sprite_ram[i * 4 + 1];
+            let sprite_status = self.sprite_ram[i * 4 + 2];
+            let pos_x = self.sprite_ram[i * 4 + 3];
+
+            // キャラクタROMからスプライトデータを読み取る
+            sprite.clear();
+            for j in 0..16 {
+                let sprite_line = self.bus.read_byte((sprite_index as u16 * 16) + j + self.ctrl_register.base_sprite_pattern_address);
+                sprite.push(sprite_line);
+            }
+
+            // スプライトを組み立てる
+            let palette: u8 = match sprite_status & 0b0000_0011 {
+                0b00 => 0,
+                0b01 => 1,
+                0b10 => 2,
+                0b11 => 3,
+                _ => panic!("invalid operation")
+            };
+
+            // 座標値に応じてグラフィックバッファにスプライトを書き込む
+            tile.clear();
+            for j in 0..8 {
+                let sprite_low = sprite[j];
+                let sprite_high = sprite[j + 8];
+                // TODO ステータスを見て反転具合考えないと
+                for k in (0..8).rev() {
+                    let a = 0x01 << k;
+                    let l = (sprite_low & a) >> k;
+                    let h = ((sprite_high & a) >> k) * 2;
+                    let pixel = l + h;
+                    let pixel_color = self.sprite_palette[(palette * 4 + pixel) as usize];
+                    tile.push(pixel_color)
+                }
+            }
+
+            for row in 0..8 {
+                for col in 0..8 {
+                    let pos = 256 * (pos_y as usize + row) + pos_x as usize + col;
                     let pixel = tile[(row * 8 + col) as usize];
                     self.graphic_buffer[pos as usize] = COLOR[pixel as usize];
                 }
