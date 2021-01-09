@@ -6,26 +6,32 @@ use crate::nes::ppu::Ppu;
 use std::io::{Read, BufRead};
 use crate::nes::ppu_bus::PpuBus;
 use std::cell::{Ref, RefCell};
+use crate::nes::keypad::KeyPad;
+use minifb::Key;
 
 
 pub struct Emulator {
     cpu: Cpu,
     ppu: Rc<RefCell<Ppu>>,
     cycle_count: u16,
+    keypad: Rc<RefCell<KeyPad>>
 }
 
 impl Emulator {
     pub fn new(cartridge: Cartridge) -> Emulator {
+        let keypad = Rc::new(RefCell::new(KeyPad::default()));
         let cartridge_rc = Rc::new(cartridge);
         let ppu_bus = PpuBus::new(cartridge_rc.clone());
         let ppu = Ppu::new(ppu_bus);
         let ppu_rc = Rc::new(RefCell::new(ppu));
         let cpu_bus = CpuBus::new(ppu_rc.clone(), cartridge_rc.clone());
         let cpu = Cpu::new(cpu_bus);
+
         Emulator {
             cpu,
             ppu: ppu_rc,
             cycle_count: 0,
+            keypad
         }
     }
 
