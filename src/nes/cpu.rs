@@ -60,6 +60,7 @@ impl Cpu {
 
         let cycle = match opcode {
             0x10 => self.bpl(),
+            0x29 => self.and_immediate(),
             0x4C => self.jmp_absolute(),
             0x78 => self.sei(),
             0x88 => self.dey(),
@@ -164,6 +165,18 @@ impl Cpu {
 
         print!("STA absolute address:{:#06X} register_a:{:#06X}", address, self.a);
         4
+    }
+
+    fn and_immediate(&mut self) -> u16 {
+        let operand = self.fetch_byte();
+        self.a &= operand;
+
+        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.a == 0 { true } else { false };
+
+        print!("AND immediate A:{:#06X} OP:{:#06X}", self.a, operand);
+
+        2
     }
 
     fn inx(&mut self) -> u16 {
