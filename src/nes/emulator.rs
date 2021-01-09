@@ -24,7 +24,7 @@ impl Emulator {
         let ppu_bus = PpuBus::new(cartridge_rc.clone());
         let ppu = Ppu::new(ppu_bus);
         let ppu_rc = Rc::new(RefCell::new(ppu));
-        let cpu_bus = CpuBus::new(ppu_rc.clone(), cartridge_rc.clone());
+        let cpu_bus = CpuBus::new(ppu_rc.clone(), cartridge_rc.clone(), keypad.clone());
         let cpu = Cpu::new(cpu_bus);
 
         Emulator {
