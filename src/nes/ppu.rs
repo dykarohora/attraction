@@ -217,10 +217,12 @@ impl Ppu {
 
         for i in 0..64 {
             // スプライトRAMから4バイトデータを読み出す
-            let pos_y = (self.sprite_ram[i * 4] as i8) - 1;
-            if pos_y < 0 {
+            let mut pos_y = self.sprite_ram[i * 4];
+            if pos_y == 0 {
                 continue;
             }
+
+            pos_y += 1;
 
             let sprite_index = self.sprite_ram[i * 4 + 1];
             let sprite_status = self.sprite_ram[i * 4 + 2];
