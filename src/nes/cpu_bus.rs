@@ -30,7 +30,7 @@ impl CpuBus {
             0x1000..=0x17FF => self.wram.read_byte(address - 0x1000),
             0x1800..=0x1FFF => self.wram.read_byte(address - 0x1800),
             0x2000..=0x2007 => self.ppu.borrow().read_ppu(address),
-            0x4016 | 0x4017 => self.keypad.borrow().read_input(address),
+            0x4016 | 0x4017 => self.keypad.borrow_mut().read_input(address),
             0x8000..=0xFFFF => self.cartridge.read_byte(address - 0x8000),
             _ => panic!("[Bus] not implemented for read_byte address:{:#06X}", address)
         }

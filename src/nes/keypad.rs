@@ -22,7 +22,7 @@ impl KeyPad {
         }
     }
 
-    pub fn read_input(&self, address: u16) -> u8 {
+    pub fn read_input(&mut self, address: u16) -> u8 {
         match address {
             0x4016 => {
                 self.input_player1.read_input()
@@ -53,8 +53,9 @@ impl Input {
         self.current_read_index = 0;
     }
 
-    pub fn read_input(&self) -> u8 {
+    pub fn read_input(&mut self) -> u8 {
         let mask = 0b0000_0001 << self.current_read_index;
+        self.current_read_index += 1;
         (self.register & mask) >> self.current_read_index
     }
 }
