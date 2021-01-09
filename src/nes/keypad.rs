@@ -6,6 +6,14 @@ pub struct KeyPad {
 }
 
 impl KeyPad {
+    pub fn update_key_buffer_for_player1(&mut self, buffer: u8) {
+        self.input_player1.update_key_buffer(buffer)
+    }
+
+    pub fn update_key_buffer_for_player2(&mut self, buffer: u8) {
+        self.input_player2.update_key_buffer(buffer)
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             0x01 => {
@@ -55,7 +63,8 @@ impl Input {
 
     pub fn read_input(&mut self) -> u8 {
         let mask = 0b0000_0001 << self.current_read_index;
+        let val = (self.register & mask) >> self.current_read_index;
         self.current_read_index += 1;
-        (self.register & mask) >> self.current_read_index
+        val
     }
 }

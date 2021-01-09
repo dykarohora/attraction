@@ -54,9 +54,7 @@ impl Cpu {
 
     pub fn run_instruction(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        if opcode != 0x4C {
-            print!("opcode: {:#04X} ", opcode);
-        };
+        print!("opcode: {:#04X} ", opcode);
 
         let cycle = match opcode {
             0x10 => self.bpl(),
@@ -71,15 +69,17 @@ impl Cpu {
             0xA9 => self.lda_immediate(),
             0xAD => self.lda_absolute(),
             0xBD => self.lda_absolute_x(),
+            0xCE => self.dec_absolute(),
             0xD0 => self.bne(),
+            0xD8 => self.cld(),
             0xE0 => self.cpx_immediate(),
             0xE8 => self.inx(),
+            0xEE => self.inc_absolute(),
+            0xF0 => self.beq(),
             _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
         };
 
-        if opcode != 0x4C {
-            println!();
-        };
+        println!();
         cycle
     }
 
@@ -189,6 +189,30 @@ impl Cpu {
         2
     }
 
+    fn inc_absolute(&mut self) -> u16 {
+        let address = self.fetch_word();
+        let byte = self.read_byte(address);
+        let result = byte.wrapping_add(1);
+        self.write_byte(address, result);
+
+        self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if result == 0 { true } else { false };
+
+        6
+    }
+
+    fn dec_absolute(&mut self) -> u16 {
+        let address = self.fetch_word();
+        let byte = self.read_byte(address);
+        let result = byte.wrapping_sub(1);
+        self.write_byte(address, result);
+
+        self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if result == 0 { true } else { false };
+
+        6
+    }
+
     fn dey(&mut self) -> u16 {
         print!("DEY");
         self.y = self.y.wrapping_sub(1);
@@ -212,6 +236,26 @@ impl Cpu {
                 }
                 false => { self.pc += offset as u16 }
             }
+        }
+
+        2
+    }
+
+    fn beq(&mut self) -> u16 {
+        let mut offset = self.fetch_byte();
+        print!("BEQ offset:{:#06X}", offset);
+
+        if self.status.zero == true {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    // self.pc.wrapping_sub(offset as u16)
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            };
         }
 
         2
@@ -268,6 +312,10 @@ impl Cpu {
         // println!("TXS");
         self.sp = self.x;
 
+        2
+    }
+
+    fn cld(&mut self) -> u16 {
         2
     }
 

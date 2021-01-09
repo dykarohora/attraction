@@ -56,4 +56,8 @@ impl Emulator {
     pub fn get_graphic_buffer(&self) -> Vec<u32> {
         self.ppu.borrow().get_graphic_buffer().clone()
     }
+
+    pub fn update_key_buffer(&self, buffer: u8) {
+        self.keypad.borrow_mut().update_key_buffer_for_player1(buffer)
+    }
 }

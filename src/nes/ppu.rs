@@ -270,7 +270,7 @@ impl Ppu {
         }
     }
 
-    pub fn read_ppu(&self, address: u16) -> u8 {
+    pub fn read_ppu(&mut self, address: u16) -> u8 {
         match address {
             0x2000 => panic!("[PPU] not implemented read 0x2000"),
             0x2001 => panic!("[PPU] not implemented read 0x2001"),
@@ -335,8 +335,10 @@ impl Ppu {
         self.ppu_addr += 1;
     }
 
-    fn read_ppu_status(&self) -> u8 {
-        self.status_register.get_binary()
+    fn read_ppu_status(&mut self) -> u8 {
+        let val = self.status_register.get_binary();
+        self.status_register.clear_vblank();
+        val
     }
 
     // バックグラウンドパレットへの書き込み
