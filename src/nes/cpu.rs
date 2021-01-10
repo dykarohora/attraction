@@ -1,6 +1,9 @@
 use std::fmt;
-use crate::nes::cpu_bus::CpuBus;
 use std::fmt::Formatter;
+use crate::nes::cpu_bus::CpuBus;
+use crate::nes::opcode::{Addressing, Instruction};
+use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, IndirectIndexed, AbsoluteX};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ};
 
 #[derive(Default)]
 pub struct Cpu {
@@ -52,198 +55,235 @@ impl Cpu {
         self.pc = self.read_word(0xFFFC);
     }
 
-    pub fn run_instruction(&mut self) -> u16 {
+    pub fn run(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        print!("opcode: {:#04X} ", opcode);
-
-        let cycle = match opcode {
-            0x10 => self.bpl(),
-            0x29 => self.and_immediate(),
-            0x4C => self.jmp_absolute(),
-            0x78 => self.sei(),
-            0x88 => self.dey(),
-            0x8D => self.sta_absolute(),
-            0x9A => self.txs(),
-            0xA0 => self.ldy_immediate(),
-            0xA2 => self.ldx_immediate(),
-            0xA9 => self.lda_immediate(),
-            0xAD => self.lda_absolute(),
-            0xBD => self.lda_absolute_x(),
-            0xCE => self.dec_absolute(),
-            0xD0 => self.bne(),
-            0xD8 => self.cld(),
-            0xE0 => self.cpx_immediate(),
-            0xE8 => self.inx(),
-            0xEE => self.inc_absolute(),
-            0xF0 => self.beq(),
-            _ => panic!("[Cpu] Not implemented opcode {:#04X}", opcode)
-        };
-
-        println!();
-        cycle
+        let instruction = self.decode_instruction(opcode);
+        self.execute_instruction(instruction)
     }
 
-    fn fetch_byte(&mut self) -> u8 {
-        let byte = self.read_byte(self.pc);
-        self.pc += 1;
-        byte
+    fn resolve_addressing(&mut self, addressing: Addressing) -> u16 {
+        use Addressing::*;
+        match addressing {
+            Immediate => {
+                let address = self.pc;
+                self.pc += 1;
+                address
+            }
+            Absolute => self.fetch_word(),
+            AbsoluteX => self.fetch_word() + (self.x as u16),
+            Zeropage => self.fetch_byte() as u16,
+            IndirectIndexed => panic!("not implemented")
+        }
     }
 
-    fn fetch_word(&mut self) -> u16 {
-        let word = self.read_word(self.pc);
-        self.pc += 2;
-        word
+    fn decode_instruction(&mut self, opcode: u8) -> Instruction {
+        match opcode {
+            0x10 => BPL { cycle: 2 },
+            0x29 => AND { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
+            0x4C => JMP { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
+            0x78 => SEI { cycle: 2 },
+            0x84 => STY { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 3 },
+            0x88 => DEY { cycle: 2 },
+            0x8D => STA { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 4 },
+            0x91 => STA { operand: self.resolve_addressing(IndirectIndexed), addressing: IndirectIndexed, cycle: 6 },
+            0x9A => TXS { cycle: 2 },
+            0xA0 => LDY { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
+            0xA2 => LDX { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
+            0xA9 => LDA { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
+            0xAD => LDA { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
+            0xBD => LDA { operand: self.resolve_addressing(AbsoluteX), addressing: AbsoluteX, cycle: 4 },
+            0xCE => DEC { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 6 },
+            0xD0 => BNE { cycle: 2 },
+            0xD8 => CLD { cycle: 2 },
+            0xE0 => CPX { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
+            0xE8 => INX { cycle: 2 },
+            0xEE => INC { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 6 },
+            0xF0 => BEQ { cycle: 2 },
+            _ => panic!("[CPU] Not implemented opcode: {:#04X}", opcode)
+        }
     }
 
-    fn sei(&mut self) -> u16 {
-        // println!("SEI immediate");
-        self.status.interrupt = true;
-        2
+    fn execute_instruction(&mut self, instruction: Instruction) -> u16 {
+        println!("{:?}", instruction);
+        use Instruction::*;
+        match instruction {
+            LDA { operand, cycle, .. } => {
+                self.lda(operand);
+                cycle
+            }
+            LDX { operand, cycle, .. } => {
+                self.ldx(operand);
+                cycle
+            }
+            LDY { operand, cycle, .. } => {
+                self.ldy(operand);
+                cycle
+            }
+            STA { operand, cycle, .. } => {
+                self.sta(operand);
+                cycle
+            }
+            STY { operand, cycle, .. } => {
+                self.sty(operand);
+                cycle
+            }
+            TXS { cycle } => {
+                self.txs();
+                cycle
+            }
+
+            AND { operand, cycle, .. } => {
+                self.and(operand);
+                cycle
+            }
+            CPX { operand, cycle, .. } => {
+                self.cpx(operand);
+                cycle
+            }
+            DEC { operand, cycle, .. } => {
+                self.dec(operand);
+                cycle
+            }
+            DEY { cycle } => {
+                self.dey();
+                cycle
+            }
+            INC { operand, cycle, .. } => {
+                self.inc(operand);
+                cycle
+            }
+            INX { cycle } => {
+                self.inx();
+                cycle
+            }
+
+            JMP { operand, cycle, .. } => {
+                self.jmp(operand);
+                cycle
+            }
+
+            BEQ { cycle } => {
+                self.beq();
+                cycle
+            }
+            BNE { cycle } => {
+                self.bne();
+                cycle
+            }
+            BPL { cycle } => {
+                self.bpl();
+                cycle
+            }
+
+            CLD { cycle } => {
+                self.cld();
+                cycle
+            }
+            SEI { cycle } => {
+                self.sei();
+                cycle
+            }
+            _ => panic!("not implemented")
+        }
     }
 
-    fn ldx_immediate(&mut self) -> u16 {
-        let operand = self.fetch_byte();
-        self.x = operand;
+    // 転送命令
+    fn lda(&mut self, operand: u16) {
+        self.a = self.read_byte(operand);
+
+        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.a == 0 { true } else { false };
+    }
+
+    fn ldx(&mut self, operand: u16) {
+        self.x = self.read_byte(operand);
 
         self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.x == 0 { true } else { false };
-
-        print!("LDX immediate {:#06X}", self.x);
-        2
     }
 
-    fn ldy_immediate(&mut self) -> u16 {
-        let operand = self.fetch_byte();
-        self.y = operand;
+    fn ldy(&mut self, operand: u16) {
+        self.y = self.read_byte(operand);
 
         self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.y == 0 { true } else { false };
-
-        // println!("LDY immediate {:#06X}", self.y);
-
-        2
     }
 
-    fn lda_immediate(&mut self) -> u16 {
-        let operand = self.fetch_byte();
-        self.a = operand;
+    fn sta(&mut self, operand: u16) {
+        self.write_byte(operand, self.a);
+    }
+
+    fn sty(&mut self, operand: u16) {
+        self.write_byte(operand, self.y);
+    }
+
+    fn txs(&mut self) {
+        self.sp = self.x;
+    }
+
+    // 算術命令
+    fn and(&mut self, operand: u16) {
+        self.a &= self.read_byte(operand);
 
         self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.a == 0 { true } else { false };
-
-        print!("LDA immediate {:#06X}", self.a);
-
-        2
     }
 
-    fn lda_absolute(&mut self) -> u16 {
-        let address = self.fetch_word();
-        let byte = self.read_byte(address);
-        self.a = byte;
+    fn cpx(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let result = self.x as i8 - byte as i8;
 
-        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.a == 0 { true } else { false };
-
-        4
-    }
-
-    fn lda_absolute_x(&mut self) -> u16 {
-        let address = self.fetch_word();
-        let byte = self.read_byte(address + self.x as u16);
-        self.a = byte;
-
-        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.a == 0 { true } else { false };
-
-        print!("LDA absolute {:#06X}", self.a);
-        4
-    }
-
-    fn sta_absolute(&mut self) -> u16 {
-        let address = self.fetch_word();
-        self.write_byte(address, self.a);
-
-        print!("STA absolute address:{:#06X} register_a:{:#06X}", address, self.a);
-        4
-    }
-
-    fn and_immediate(&mut self) -> u16 {
-        let operand = self.fetch_byte();
-        self.a &= operand;
-
-        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.a == 0 { true } else { false };
-
-        print!("AND immediate A:{:#06X} OP:{:#06X}", self.a, operand);
-
-        2
-    }
-
-    fn inx(&mut self) -> u16 {
-        print!("INX");
-        self.x = self.x.wrapping_add(1);
-
-        self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.x == 0 { true } else { false };
-
-        2
-    }
-
-    fn inc_absolute(&mut self) -> u16 {
-        let address = self.fetch_word();
-        let byte = self.read_byte(address);
-        let result = byte.wrapping_add(1);
-        self.write_byte(address, result);
-
-        self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if result == 0 { true } else { false };
 
-        6
+        if result >= 0 {
+            self.status.negative = false;
+            self.status.carry = true;
+        } else {
+            self.status.negative = true;
+            self.status.carry = false;
+        };
     }
 
-    fn dec_absolute(&mut self) -> u16 {
-        let address = self.fetch_word();
-        let byte = self.read_byte(address);
+    fn dec(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
         let result = byte.wrapping_sub(1);
-        self.write_byte(address, result);
+        self.write_byte(operand, result);
 
         self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if result == 0 { true } else { false };
-
-        6
     }
 
-    fn dey(&mut self) -> u16 {
-        print!("DEY");
+    fn dey(&mut self) {
         self.y = self.y.wrapping_sub(1);
 
         self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
         self.status.zero = if self.y == 0 { true } else { false };
-
-        2
     }
 
-    fn bpl(&mut self) -> u16 {
-        let mut offset = self.fetch_byte();
+    fn inc(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let result = byte.wrapping_add(1);
+        self.write_byte(operand, result);
 
-        if self.status.negative == false {
-            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
-
-            match is_negative {
-                true => {
-                    offset = !offset + 1;
-                    self.pc -= offset as u16
-                }
-                false => { self.pc += offset as u16 }
-            }
-        }
-
-        2
+        self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if result == 0 { true } else { false };
     }
 
-    fn beq(&mut self) -> u16 {
+    fn inx(&mut self) {
+        self.x = self.x.wrapping_add(1);
+
+        self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.zero = if self.x == 0 { true } else { false };
+    }
+
+    // ジャンプ命令
+    fn jmp(&mut self, operand: u16) {
+        self.pc = operand
+    }
+
+    // 分岐命令
+    fn beq(&mut self) {
         let mut offset = self.fetch_byte();
-        print!("BEQ offset:{:#06X}", offset);
 
         if self.status.zero == true {
             let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
@@ -257,13 +297,10 @@ impl Cpu {
                 false => { self.pc += offset as u16 }
             };
         }
-
-        2
     }
 
-    fn bne(&mut self) -> u16 {
+    fn bne(&mut self) {
         let mut offset = self.fetch_byte();
-        print!("BNE offset:{:#06X}", offset);
 
         if self.status.zero == false {
             let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
@@ -271,51 +308,34 @@ impl Cpu {
             match is_negative {
                 true => {
                     offset = !offset + 1;
-                    // self.pc.wrapping_sub(offset as u16)
                     self.pc -= offset as u16
                 }
                 false => { self.pc += offset as u16 }
             };
         }
-
-        2
     }
 
-    fn cpx_immediate(&mut self) -> u16 {
-        let operand = self.fetch_byte();
+    fn bpl(&mut self) {
+        let mut offset = self.fetch_byte();
 
-        print!("CPX compare X:{:#06X} to operand:{:#06X}", self.x, operand);
+        if self.status.negative == false {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
 
-        let result = self.x as i8 - operand as i8;
-
-        self.status.zero = if result == 0 { true } else { false };
-
-        if result >= 0 {
-            self.status.negative = false;
-            self.status.carry = true;
-        } else {
-            self.status.negative = true;
-            self.status.carry = false;
-        };
-
-        2
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            }
+        }
     }
 
-    fn jmp_absolute(&mut self) -> u16 {
-        // println!("JMP absolute");
-        let address = self.fetch_word();
-        self.pc = address;
-        3
-    }
+    // フラグ変更命令
+    fn cld(&mut self) {}
 
-    fn txs(&mut self) -> u16 {
-        // println!("TXS");
-        self.sp = self.x;
-
-        2
-    }
-
-    fn cld(&mut self) -> u16 {
+    fn sei(&mut self) -> u16 {
+        self.status.interrupt = true;
         2
     }
 
@@ -331,6 +351,18 @@ impl Cpu {
 
     fn write_byte(&mut self, address: u16, byte: u8) {
         self.bus.write_byte(address, byte)
+    }
+
+    fn fetch_byte(&mut self) -> u8 {
+        let byte = self.read_byte(self.pc);
+        self.pc += 1;
+        byte
+    }
+
+    fn fetch_word(&mut self) -> u16 {
+        let word = self.read_word(self.pc);
+        self.pc += 2;
+        word
     }
 }
 

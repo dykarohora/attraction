@@ -41,7 +41,7 @@ impl Emulator {
 
     pub fn frame(&mut self) {
         loop {
-            let cycle = self.cpu.run_instruction();
+            let cycle = self.cpu.run();
             self.cycle_count += cycle;
             self.ppu.borrow_mut().run(cycle * 3);
 

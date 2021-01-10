@@ -291,7 +291,7 @@ impl Ppu {
             0x2002 => panic!("[PPU] not implemented write 0x2002 byte:{:#04X}", byte),
             0x2003 => self.write_sprite_addr(byte),
             0x2004 => self.write_sprite_data(byte),
-            0x2005 => panic!("[PPU] not implemented write 0x2005 byte:{:#04X}", byte),
+            0x2005 => {},
             0x2006 => self.write_ppu_addr(byte),
             0x2007 => self.write_ppu_data(byte),
             _ => panic!("[PPU] invalid address: {:#06X}", address)

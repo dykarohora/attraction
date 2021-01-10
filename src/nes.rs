@@ -10,3 +10,4 @@ pub mod color;
 pub mod ppu_status_register;
 pub mod ppu_ctrl_register;
 mod keypad;
+mod opcode;
