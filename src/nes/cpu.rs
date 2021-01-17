@@ -104,7 +104,6 @@ impl Cpu {
     }
 
     fn execute_instruction(&mut self, instruction: Instruction) -> u16 {
-        println!("{:?}", instruction);
         use Instruction::*;
         match instruction {
             LDA { operand, cycle, .. } => {
@@ -141,7 +140,7 @@ impl Cpu {
                 cycle
             }
             DEC { operand, cycle, .. } => {
-                self.dec(operand);
+                let calculation_result = self.dec(operand);
                 cycle
             }
             DEY { cycle } => {
@@ -190,23 +189,20 @@ impl Cpu {
     // 転送命令
     fn lda(&mut self, operand: u16) {
         self.a = self.read_byte(operand);
-
-        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.a == 0 { true } else { false };
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
     }
 
     fn ldx(&mut self, operand: u16) {
         self.x = self.read_byte(operand);
-
-        self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.x == 0 { true } else { false };
+        self.update_negative_flag(self.x);
+        self.update_zero_flag(self.x);
     }
 
     fn ldy(&mut self, operand: u16) {
         self.y = self.read_byte(operand);
-
-        self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.y == 0 { true } else { false };
+        self.update_negative_flag(self.y);
+        self.update_zero_flag(self.y);
     }
 
     fn sta(&mut self, operand: u16) {
@@ -224,9 +220,8 @@ impl Cpu {
     // 算術命令
     fn and(&mut self, operand: u16) {
         self.a &= self.read_byte(operand);
-
-        self.status.negative = if (self.a & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.a == 0 { true } else { false };
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
     }
 
     fn cpx(&mut self, operand: u16) {
@@ -248,32 +243,28 @@ impl Cpu {
         let byte = self.read_byte(operand);
         let result = byte.wrapping_sub(1);
         self.write_byte(operand, result);
-
-        self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if result == 0 { true } else { false };
+        self.update_negative_flag(result);
+        self.update_zero_flag(result);
     }
 
     fn dey(&mut self) {
         self.y = self.y.wrapping_sub(1);
-
-        self.status.negative = if (self.y & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.y == 0 { true } else { false };
+        self.update_negative_flag(self.y);
+        self.update_zero_flag(self.y);
     }
 
     fn inc(&mut self, operand: u16) {
         let byte = self.read_byte(operand);
         let result = byte.wrapping_add(1);
         self.write_byte(operand, result);
-
-        self.status.negative = if (result & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if result == 0 { true } else { false };
+        self.update_negative_flag(result);
+        self.update_zero_flag(result);
     }
 
     fn inx(&mut self) {
         self.x = self.x.wrapping_add(1);
-
-        self.status.negative = if (self.x & 0b1000_0000) >> 7 == 1 { true } else { false };
-        self.status.zero = if self.x == 0 { true } else { false };
+        self.update_negative_flag(self.x);
+        self.update_zero_flag(self.x);
     }
 
     // ジャンプ命令
@@ -363,6 +354,14 @@ impl Cpu {
         let word = self.read_word(self.pc);
         self.pc += 2;
         word
+    }
+
+    fn update_negative_flag(&mut self, calculation_result: u8) {
+        self.status.negative = if (calculation_result & 0b1000_0000) >> 7 == 1 { true } else { false };
+    }
+
+    fn update_zero_flag(&mut self, calculation_result: u8) {
+        self.status.zero = if calculation_result == 0 { true } else { false };
     }
 }
 
