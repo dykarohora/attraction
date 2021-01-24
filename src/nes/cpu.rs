@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
-use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, IndirectIndexed, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY};
+use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed};
 use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX};
 
 #[derive(Default)]
@@ -57,7 +57,6 @@ impl Cpu {
 
     pub fn run(&mut self) -> u16 {
         let opcode = self.fetch_byte();
-        println!("opcode: {:#04X}", opcode);
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
     }
@@ -147,8 +146,10 @@ impl Cpu {
                     AbsoluteY(operand) |
                     ZeropageX(operand) |
                     ZeropageY(operand) |
-                    IndirectIndexed(operand)
-                    => self.lda(operand)
+                    IndirectIndexed(operand) |
+                    IndexedIndirect(operand)
+                    => self.lda(operand),
+                    _ => panic!("Invalid Operation LDA addressing: {:?}", addressing)
                 }
                 cycle
             }
@@ -156,45 +157,98 @@ impl Cpu {
                 match addressing {
                     Immediate(operand) |
                     Absolute(operand) |
-                    Zeropage(operand) |
                     AbsoluteY(operand) |
+                    Zeropage(operand) |
                     ZeropageY(operand)
                     => self.ldx(operand),
-                    _ => panic!("Invalid Operation")
+                    _ => panic!("Invalid Operation LDX addressing: {:?}", addressing)
                 }
                 cycle
             }
             LDY { addressing, cycle, .. } => {
-                self.ldy(operand);
+                match addressing {
+                    Immediate(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    Zeropage(operand) |
+                    ZeropageY(operand)
+                    => self.ldy(operand),
+                    _ => panic!("Invalid Operation LDY addressing: {:?}", addressing)
+                }
                 cycle
             }
             STA { addressing, cycle, .. } => {
-                self.sta(operand);
+                match addressing {
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    IndexedIndirect(operand) |
+                    IndirectIndexed(operand)
+                    => self.sta(operand),
+                    _ => panic!("Invalid Operation STA addressing: {:?}", addressing)
+                }
                 cycle
             }
             STX { addressing, cycle, .. } => {
-                self.stx(operand);
+                match addressing {
+                    Zeropage(operand) |
+                    ZeropageY(operand) |
+                    Absolute(operand)
+                    => self.stx(operand),
+                    _ => panic!("Invalid Operation STX addressing: {:?}", addressing)
+                }
                 cycle
             }
             STY { addressing, cycle, .. } => {
-                self.sty(addressing);
+                match addressing {
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand)
+                    => self.stx(operand),
+                    _ => panic!("Invalid Operation STY addressing: {:?}", addressing)
+                }
                 cycle
             }
             TXS { cycle } => {
                 self.txs();
                 cycle
             }
-
             AND { addressing, cycle, .. } => {
-                self.and(operand);
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    IndirectIndexed(operand) |
+                    IndexedIndirect(operand)
+                    => self.and(operand),
+                    _ => panic!("Invalid Operation AND addressing: {:?}", addressing)
+                }
                 cycle
             }
             CPX { addressing, cycle, .. } => {
-                self.cpx(operand);
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    Absolute(operand)
+                    => self.cpx(operand),
+                    _ => panic!("Invalid Operation CPX addressing: {:?}", addressing)
+                }
                 cycle
             }
             DEC { addressing, cycle, .. } => {
-                self.dec(operand);
+                match addressing {
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand)
+                    => self.dec(operand),
+                    _ => panic!("Invalid Operation DEC addressing: {:?}", addressing)
+                }
                 cycle
             }
             DEX { cycle } => {
@@ -206,7 +260,14 @@ impl Cpu {
                 cycle
             }
             INC { addressing, cycle, .. } => {
-                self.inc(operand);
+                match addressing {
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand)
+                    => self.inc(operand),
+                    _ => panic!("Invalid Operation INC addressing: {:?}", addressing)
+                }
                 cycle
             }
             INX { cycle } => {
@@ -215,7 +276,12 @@ impl Cpu {
             }
 
             JMP { addressing, cycle, .. } => {
-                self.jmp(operand);
+                match addressing {
+                    Absolute(operand) |
+                    Indirect(operand)
+                    => self.jmp(operand),
+                    _ => panic!("Invalid Operation JMP addressing: {:?}", addressing)
+                }
                 cycle
             }
 
