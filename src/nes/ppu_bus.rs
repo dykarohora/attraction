@@ -11,7 +11,7 @@ pub struct PpuBus {
 impl PpuBus {
     pub fn new(cartridge: Rc<Cartridge>) -> PpuBus {
         PpuBus {
-            vram: Ram::new(2048),
+            vram: Ram::new(2048 * 2),
             cartridge,
         }
     }
@@ -26,7 +26,7 @@ impl PpuBus {
 
     pub fn write_byte(&mut self, address: u16, byte: u8) {
         match address {
-            0x2000..=0x23FF => self.vram.write_byte(address - 0x2000, byte),
+            0x2000..=0x2FFF => self.vram.write_byte(address - 0x2000, byte),
             _ => panic!("[PPU BUS] not implemented for write_byte address:{:#06X}, byte:{:#06X}", address, byte)
         }
     }

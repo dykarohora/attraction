@@ -326,7 +326,7 @@ impl Ppu {
     fn write_ppu_data(&mut self, byte: u8) {
         // PPU ADDRによって
         match self.ppu_addr {
-            0x2000..=0x23FF => self.bus.write_byte(self.ppu_addr, byte),
+            0x2000..=0x2FFF => self.bus.write_byte(self.ppu_addr, byte),
             0x3F00..=0x3F0F => self.write_background_palette(self.ppu_addr, byte),
             0x3F10..=0x3F1F => self.write_sprite_palette(self.ppu_addr, byte),
             _ => panic!("[Ppu] not implemented or invalid address: {:#06X} byte: {:#04X}", self.ppu_addr, byte)

@@ -7,6 +7,9 @@ pub enum Addressing {
     Absolute,
     Zeropage,
     AbsoluteX,
+    AbsoluteY,
+    ZeropageX,
+    ZeropageY,
     IndirectIndexed,
 }
 

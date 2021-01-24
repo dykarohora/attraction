@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, IndirectIndexed, AbsoluteX};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX};
 
 #[derive(Default)]
 pub struct Cpu {
@@ -57,6 +57,7 @@ impl Cpu {
 
     pub fn run(&mut self) -> u16 {
         let opcode = self.fetch_byte();
+        println!("opcode: {:#04X}", opcode);
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
     }
@@ -71,8 +72,23 @@ impl Cpu {
             }
             Absolute => self.fetch_word(),
             AbsoluteX => self.fetch_word() + (self.x as u16),
+            AbsoluteY => self.fetch_word() + (self.y as u16),
             Zeropage => self.fetch_byte() as u16,
-            IndirectIndexed => panic!("not implemented")
+            ZeropageX => {
+                let byte = self.fetch_byte();
+                byte.wrapping_add(self.x) as u16
+            }
+            ZeropageY => {
+                let byte = self.fetch_byte();
+                byte.wrapping_add(self.y) as u16
+            }
+            IndirectIndexed => {
+                let temp_address = self.fetch_byte() as u16;
+                let high = self.read_byte(temp_address) as u16;
+                let low = self.read_byte(temp_address + 1) as u16;
+                let address = ((high << 8) | low).wrapping_add(self.y as u16);
+                address
+            }
         }
     }
 
@@ -83,8 +99,11 @@ impl Cpu {
             0x4C => JMP { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
             0x78 => SEI { cycle: 2 },
             0x84 => STY { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 3 },
+            0x85 => STA { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 3 },
             0x88 => DEY { cycle: 2 },
+            0x8C => STY { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
             0x8D => STA { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 4 },
+            0x8E => STX { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 4 },
             0x91 => STA { operand: self.resolve_addressing(IndirectIndexed), addressing: IndirectIndexed, cycle: 6 },
             0x9A => TXS { cycle: 2 },
             0xA0 => LDY { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
@@ -92,6 +111,8 @@ impl Cpu {
             0xA9 => LDA { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
             0xAD => LDA { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
             0xBD => LDA { operand: self.resolve_addressing(AbsoluteX), addressing: AbsoluteX, cycle: 4 },
+            0xC6 => DEC { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 5 },
+            0xCA => DEX { cycle: 2 },
             0xCE => DEC { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 6 },
             0xD0 => BNE { cycle: 2 },
             0xD8 => CLD { cycle: 2 },
@@ -104,6 +125,7 @@ impl Cpu {
     }
 
     fn execute_instruction(&mut self, instruction: Instruction) -> u16 {
+        println!("{:?}", instruction);
         use Instruction::*;
         match instruction {
             LDA { operand, cycle, .. } => {
@@ -120,6 +142,10 @@ impl Cpu {
             }
             STA { operand, cycle, .. } => {
                 self.sta(operand);
+                cycle
+            }
+            STX { operand, cycle, .. } => {
+                self.stx(operand);
                 cycle
             }
             STY { operand, cycle, .. } => {
@@ -140,7 +166,11 @@ impl Cpu {
                 cycle
             }
             DEC { operand, cycle, .. } => {
-                let calculation_result = self.dec(operand);
+                self.dec(operand);
+                cycle
+            }
+            DEX { cycle } => {
+                self.dex();
                 cycle
             }
             DEY { cycle } => {
@@ -209,6 +239,10 @@ impl Cpu {
         self.write_byte(operand, self.a);
     }
 
+    fn stx(&mut self, operand: u16) {
+        self.write_byte(operand, self.x);
+    }
+
     fn sty(&mut self, operand: u16) {
         self.write_byte(operand, self.y);
     }
@@ -245,6 +279,12 @@ impl Cpu {
         self.write_byte(operand, result);
         self.update_negative_flag(result);
         self.update_zero_flag(result);
+    }
+
+    fn dex(&mut self) {
+        self.x = self.x.wrapping_sub(1);
+        self.update_negative_flag(self.x);
+        self.update_zero_flag(self.x);
     }
 
     fn dey(&mut self) {

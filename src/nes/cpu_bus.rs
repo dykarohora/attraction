@@ -43,7 +43,9 @@ impl CpuBus {
             0x1000..=0x17FF => self.wram.write_byte(address - 0x1000, byte),
             0x1800..=0x1FFF => self.wram.write_byte(address - 0x1800, byte),
             0x2000..=0x2007 => self.ppu.borrow_mut().write_ppu(address, byte),
+            0x4000..=0x4015 => {}
             0x4016 => self.keypad.borrow_mut().write_byte(byte),
+            0x4017 => {}
             _ => panic!("[Bus] not implemented for write_byte address:{:#06X} byte:{:#04X}", address, byte)
         }
     }
