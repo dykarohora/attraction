@@ -1,8 +1,8 @@
 use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
-use crate::nes::opcode::{Addressing, Instruction};
-use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, IndirectIndexed, AbsoluteX};
+use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
+use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, IndirectIndexed, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY};
 use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX};
 
 #[derive(Default)]
@@ -62,8 +62,8 @@ impl Cpu {
         self.execute_instruction(instruction)
     }
 
-    fn resolve_addressing(&mut self, addressing: Addressing) -> u16 {
-        use Addressing::*;
+    fn resolve_addressing(&mut self, addressing: AddressingMode) -> u16 {
+        use AddressingMode::*;
         match addressing {
             Immediate => {
                 let address = self.pc;
@@ -82,12 +82,21 @@ impl Cpu {
                 let byte = self.fetch_byte();
                 byte.wrapping_add(self.y) as u16
             }
+            Indirect => {
+                let word = self.fetch_word();
+                self.read_word(word)
+            }
             IndirectIndexed => {
-                let temp_address = self.fetch_byte() as u16;
-                let high = self.read_byte(temp_address) as u16;
-                let low = self.read_byte(temp_address + 1) as u16;
+                let byte = self.fetch_byte() as u16;
+                let high = self.read_byte(byte) as u16;
+                let low = self.read_byte(byte + 1) as u16;
                 let address = ((high << 8) | low).wrapping_add(self.y as u16);
                 address
+            }
+            IndexedIndirect => {
+                let byte = self.fetch_byte();
+                let base_address = byte.wrapping_add(self.x) as u16;
+                self.read_word(base_address)
             }
         }
     }
@@ -95,30 +104,31 @@ impl Cpu {
     fn decode_instruction(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x10 => BPL { cycle: 2 },
-            0x29 => AND { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
-            0x4C => JMP { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
+            0x29 => AND { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
             0x78 => SEI { cycle: 2 },
-            0x84 => STY { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 3 },
-            0x85 => STA { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 3 },
+            0x84 => STY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x88 => DEY { cycle: 2 },
-            0x8C => STY { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
-            0x8D => STA { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 4 },
-            0x8E => STX { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 4 },
-            0x91 => STA { operand: self.resolve_addressing(IndirectIndexed), addressing: IndirectIndexed, cycle: 6 },
+            0x8C => STY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
+            0x8D => STA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x8E => STX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x91 => STA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 6 },
             0x9A => TXS { cycle: 2 },
-            0xA0 => LDY { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
-            0xA2 => LDX { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
-            0xA9 => LDA { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
-            0xAD => LDA { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 3 },
-            0xBD => LDA { operand: self.resolve_addressing(AbsoluteX), addressing: AbsoluteX, cycle: 4 },
-            0xC6 => DEC { operand: self.resolve_addressing(Zeropage), addressing: Zeropage, cycle: 5 },
+            0xA0 => LDY { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA2 => LDX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA9 => LDA { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xAD => LDA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
+            0xB9 => LDA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0xBD => LDA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0xC6 => DEC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
             0xCA => DEX { cycle: 2 },
-            0xCE => DEC { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 6 },
+            0xCE => DEC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0xD0 => BNE { cycle: 2 },
             0xD8 => CLD { cycle: 2 },
-            0xE0 => CPX { operand: self.resolve_addressing(Immediate), addressing: Immediate, cycle: 2 },
+            0xE0 => CPX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xE8 => INX { cycle: 2 },
-            0xEE => INC { operand: self.resolve_addressing(Absolute), addressing: Absolute, cycle: 6 },
+            0xEE => INC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0xF0 => BEQ { cycle: 2 },
             _ => panic!("[CPU] Not implemented opcode: {:#04X}", opcode)
         }
@@ -128,28 +138,46 @@ impl Cpu {
         println!("{:?}", instruction);
         use Instruction::*;
         match instruction {
-            LDA { operand, cycle, .. } => {
-                self.lda(operand);
+            LDA { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Absolute(operand) |
+                    Zeropage(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    ZeropageX(operand) |
+                    ZeropageY(operand) |
+                    IndirectIndexed(operand)
+                    => self.lda(operand)
+                }
                 cycle
             }
-            LDX { operand, cycle, .. } => {
-                self.ldx(operand);
+            LDX { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Absolute(operand) |
+                    Zeropage(operand) |
+                    AbsoluteY(operand) |
+                    ZeropageY(operand)
+                    => self.ldx(operand),
+                    _ => panic!("Invalid Operation")
+                }
                 cycle
             }
-            LDY { operand, cycle, .. } => {
+            LDY { addressing, cycle, .. } => {
                 self.ldy(operand);
                 cycle
             }
-            STA { operand, cycle, .. } => {
+            STA { addressing, cycle, .. } => {
                 self.sta(operand);
                 cycle
             }
-            STX { operand, cycle, .. } => {
+            STX { addressing, cycle, .. } => {
                 self.stx(operand);
                 cycle
             }
-            STY { operand, cycle, .. } => {
-                self.sty(operand);
+            STY { addressing, cycle, .. } => {
+                self.sty(addressing);
                 cycle
             }
             TXS { cycle } => {
@@ -157,15 +185,15 @@ impl Cpu {
                 cycle
             }
 
-            AND { operand, cycle, .. } => {
+            AND { addressing, cycle, .. } => {
                 self.and(operand);
                 cycle
             }
-            CPX { operand, cycle, .. } => {
+            CPX { addressing, cycle, .. } => {
                 self.cpx(operand);
                 cycle
             }
-            DEC { operand, cycle, .. } => {
+            DEC { addressing, cycle, .. } => {
                 self.dec(operand);
                 cycle
             }
@@ -177,7 +205,7 @@ impl Cpu {
                 self.dey();
                 cycle
             }
-            INC { operand, cycle, .. } => {
+            INC { addressing, cycle, .. } => {
                 self.inc(operand);
                 cycle
             }
@@ -186,7 +214,7 @@ impl Cpu {
                 cycle
             }
 
-            JMP { operand, cycle, .. } => {
+            JMP { addressing, cycle, .. } => {
                 self.jmp(operand);
                 cycle
             }
