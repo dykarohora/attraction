@@ -66,6 +66,8 @@ pub enum Instruction {
 
     // ジャンプ命令
     JMP { addressing: Addressing, cycle: u16 },
+    JSR { cycle: u16},
+    RTS { cycle: u16},
 
     // 分岐命令
     BCC { cycle: u16 },

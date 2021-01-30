@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS};
 
 #[derive(Default)]
 pub struct Cpu {
@@ -34,7 +34,7 @@ impl Cpu {
             x: 0x00,
             y: 0x00,
             pc: 0x0000,
-            sp: 0x00,
+            sp: 0xff,
             status: Status {
                 negative: false,
                 overflow: false,
@@ -103,8 +103,10 @@ impl Cpu {
     fn decode_instruction(&mut self, opcode: u8) -> Instruction {
         match opcode {
             0x10 => BPL { cycle: 2 },
+            0x20 => JSR { cycle: 6 },
             0x29 => AND { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
+            0x60 => RTS { cycle: 6 },
             0x78 => SEI { cycle: 2 },
             0x84 => STY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
@@ -274,7 +276,6 @@ impl Cpu {
                 self.inx();
                 cycle
             }
-
             JMP { addressing, cycle, .. } => {
                 match addressing {
                     Absolute(operand) |
@@ -284,7 +285,15 @@ impl Cpu {
                 }
                 cycle
             }
-
+            JSR { cycle } => {
+                let operand = self.fetch_word();
+                self.jsr(operand);
+                cycle
+            }
+            RTS { cycle } => {
+                self.rts();
+                cycle
+            }
             BEQ { cycle } => {
                 self.beq();
                 cycle
@@ -406,6 +415,20 @@ impl Cpu {
         self.pc = operand
     }
 
+    fn jsr(&mut self, operand: u16) {
+        let program_counter = self.pc - 1;
+        self.push_to_stack(((program_counter >> 8) | 0x00ff) as u8);
+        self.push_to_stack((program_counter | 0x00ff) as u8);
+        self.pc = operand
+    }
+
+    fn rts(&mut self) {
+        let low = self.pop_from_stack() as u16;
+        let high = self.pop_from_stack() as u16;
+        let address = (high << 8) | low;
+        self.pc = address;
+    }
+
     // 分岐命令
     fn beq(&mut self) {
         let mut offset = self.fetch_byte();
@@ -488,6 +511,16 @@ impl Cpu {
         let word = self.read_word(self.pc);
         self.pc += 2;
         word
+    }
+
+    fn push_to_stack(&mut self, byte: u8) {
+        self.bus.write_byte(0x0100 | (self.sp as u16), byte);
+        self.sp -= 1;
+    }
+
+    fn pop_from_stack(&mut self) -> u8 {
+        self.sp += 1;
+        self.bus.read_byte(0x0100 | (self.sp as u16))
     }
 
     fn update_negative_flag(&mut self, calculation_result: u8) {
