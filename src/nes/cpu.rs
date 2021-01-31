@@ -3,7 +3,8 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP};
+use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
 pub struct Cpu {
@@ -123,6 +124,8 @@ impl Cpu {
             0xB9 => LDA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
             0xBD => LDA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
             0xC6 => DEC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0xC5 => CMP { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xC9 => CMP { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xCA => DEX { cycle: 2 },
             0xCE => DEC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0xD0 => BNE { cycle: 2 },
@@ -232,6 +235,21 @@ impl Cpu {
                 }
                 cycle
             }
+            CMP { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    IndirectIndexed(operand) |
+                    IndexedIndirect(operand)
+                    => self.cmp(operand),
+                    _ => panic!("Invalid Operation CMP addressing: {:?}", addressing)
+                }
+                cycle
+            }
             CPX { addressing, cycle, .. } => {
                 match addressing {
                     Immediate(operand) |
@@ -239,6 +257,16 @@ impl Cpu {
                     Absolute(operand)
                     => self.cpx(operand),
                     _ => panic!("Invalid Operation CPX addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            CPY { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    Absolute(operand)
+                    => self.cpy(operand),
+                    _ => panic!("Invalid Operation CPY addressing: {:?}", addressing)
                 }
                 cycle
             }
@@ -306,7 +334,6 @@ impl Cpu {
                 self.bpl();
                 cycle
             }
-
             CLD { cycle } => {
                 self.cld();
                 cycle
@@ -361,9 +388,21 @@ impl Cpu {
         self.update_zero_flag(self.a);
     }
 
+    fn cmp(&mut self, operand: u16) {
+        self.compare(operand, self.a);
+    }
+
     fn cpx(&mut self, operand: u16) {
+        self.compare(operand, self.x);
+    }
+
+    fn cpy(&mut self, operand: u16) {
+        self.compare(operand, self.y);
+    }
+
+    fn compare(&mut self, operand: u16, target_register: u8) {
         let byte = self.read_byte(operand);
-        let result = self.x as i8 - byte as i8;
+        let result = target_register as i8 - byte as i8;
 
         self.status.zero = if result == 0 { true } else { false };
 
@@ -416,6 +455,7 @@ impl Cpu {
     }
 
     fn jsr(&mut self, operand: u16) {
+        // 6502のJSR命令では次の命令の1つ前のアドレス(JSRの最後のバイト)をスタックに入れる
         let program_counter = self.pc - 1;
         self.push_to_stack(((program_counter >> 8) | 0x00ff) as u8);
         self.push_to_stack((program_counter | 0x00ff) as u8);
@@ -425,7 +465,9 @@ impl Cpu {
     fn rts(&mut self) {
         let low = self.pop_from_stack() as u16;
         let high = self.pop_from_stack() as u16;
-        let address = (high << 8) | low;
+        // JSR命令ではJSR命令の次の命令の1つ前のアドレスがスタックに入っているので、
+        // RTS命令で復帰する時はスタックからポップしたアドレスをインクリメントしてプログラムカウンタにセットする
+        let address = ((high << 8) | low) + 1;
         self.pc = address;
     }
 
@@ -482,9 +524,8 @@ impl Cpu {
     // フラグ変更命令
     fn cld(&mut self) {}
 
-    fn sei(&mut self) -> u16 {
+    fn sei(&mut self) {
         self.status.interrupt = true;
-        2
     }
 
     fn read_byte(&self, address: u16) -> u8 {
