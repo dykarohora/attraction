@@ -103,7 +103,7 @@ impl Ppu {
         }
     }
 
-    pub fn run(&mut self, cycle: u16) {
+    pub fn run(&mut self, cycle: u16, nmi: &mut bool) {
         self.ppu_cycle_count += cycle;
 
         if self.ppu_cycle_count < 341 {
@@ -124,12 +124,16 @@ impl Ppu {
 
         if self.current_line == 241 {
             self.status_register.set_vblank();
+            if self.ctrl_register.is_generate_nmi_when_vblank == true {
+                *nmi = true;
+            }
             return;
         }
 
         if self.current_line == 262 {
             self.status_register.clear_vblank();
             self.current_line = 0;
+            *nmi = false;
             return;
         }
     }
@@ -213,7 +217,7 @@ impl Ppu {
 
     fn build_sprites(&mut self) {
         let mut sprite = Vec::<u8>::with_capacity(16);
-        let mut tile = Vec::<u8>::with_capacity(8*8);
+        let mut tile = Vec::<u8>::with_capacity(8 * 8);
 
         for i in 0..64 {
             // スプライトRAMから4バイトデータを読み出す
@@ -291,7 +295,7 @@ impl Ppu {
             0x2002 => panic!("[PPU] not implemented write 0x2002 byte:{:#04X}", byte),
             0x2003 => self.write_sprite_addr(byte),
             0x2004 => self.write_sprite_data(byte),
-            0x2005 => {},
+            0x2005 => {}
             0x2006 => self.write_ppu_addr(byte),
             0x2007 => self.write_ppu_data(byte),
             _ => panic!("[PPU] invalid address: {:#06X}", address)

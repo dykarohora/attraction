@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK};
 use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
@@ -26,6 +26,20 @@ struct Status {
     interrupt: bool,
     zero: bool,
     carry: bool,
+}
+
+impl Status {
+    fn get_binary(&self) -> u8 {
+        let mut binary = 0b0000_0000;
+        binary = binary | if self.negative == true { 0b1000_0000 } else { 0b0000_0000 };
+        binary = binary | if self.overflow == true { 0b0100_0000 } else { 0b0000_0000 };
+        binary = binary | if self.break_flg == true { 0b0001_0000 } else { 0b0000_0000 };
+        binary = binary | if self.decimal == true { 0b0000_1000 } else { 0b0000_0000 };
+        binary = binary | if self.interrupt == true { 0b0000_0100 } else { 0b0000_0000 };
+        binary = binary | if self.zero == true { 0b0000_0010 } else { 0b0000_0000 };
+        binary = binary | if self.carry == true { 0b0000_0001 } else { 0b0000_0000 };
+        binary
+    }
 }
 
 impl Cpu {
@@ -56,7 +70,7 @@ impl Cpu {
         self.pc = self.read_word(0xFFFC);
     }
 
-    pub fn run(&mut self) -> u16 {
+    pub fn run(&mut self, nmi: &mut bool) -> u16 {
         let opcode = self.fetch_byte();
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
@@ -103,6 +117,7 @@ impl Cpu {
 
     fn decode_instruction(&mut self, opcode: u8) -> Instruction {
         match opcode {
+            0x00 => BRK { cycle: 7 },
             0x10 => BPL { cycle: 2 },
             0x20 => JSR { cycle: 6 },
             0x29 => AND { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
@@ -342,6 +357,10 @@ impl Cpu {
                 self.sei();
                 cycle
             }
+            BRK { cycle } => {
+                self.brk();
+                cycle
+            }
             _ => panic!("not implemented")
         }
     }
@@ -457,8 +476,8 @@ impl Cpu {
     fn jsr(&mut self, operand: u16) {
         // 6502のJSR命令では次の命令の1つ前のアドレス(JSRの最後のバイト)をスタックに入れる
         let program_counter = self.pc - 1;
-        self.push_to_stack(((program_counter >> 8) | 0x00ff) as u8);
-        self.push_to_stack((program_counter | 0x00ff) as u8);
+        self.push_to_stack(((program_counter >> 8) & 0x00ff) as u8);
+        self.push_to_stack((program_counter & 0x00ff) as u8);
         self.pc = operand
     }
 
@@ -528,6 +547,20 @@ impl Cpu {
         self.status.interrupt = true;
     }
 
+    // その他
+    fn brk(&mut self) {
+        self.status.break_flg = true;
+        self.pc += 1;
+        self.push_to_stack(((self.pc >> 8) | 0x00ff) as u8);
+        self.push_to_stack((self.pc | 0x00ff) as u8);
+        self.push_status_to_stack();
+        if self.status.interrupt == false {
+            self.pc = self.read_word(0xfffe);
+        }
+        self.status.interrupt = true;
+        self.pc -= 1;
+    }
+
     fn read_byte(&self, address: u16) -> u8 {
         self.bus.read_byte(address)
     }
@@ -557,6 +590,11 @@ impl Cpu {
     fn push_to_stack(&mut self, byte: u8) {
         self.bus.write_byte(0x0100 | (self.sp as u16), byte);
         self.sp -= 1;
+    }
+
+    fn push_status_to_stack(&mut self) {
+        let byte = self.status.get_binary();
+        self.push_to_stack(byte);
     }
 
     fn pop_from_stack(&mut self) -> u8 {

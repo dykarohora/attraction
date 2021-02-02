@@ -14,7 +14,8 @@ pub struct Emulator {
     cpu: Cpu,
     ppu: Rc<RefCell<Ppu>>,
     cycle_count: u16,
-    keypad: Rc<RefCell<KeyPad>>
+    keypad: Rc<RefCell<KeyPad>>,
+    nmi: bool,
 }
 
 impl Emulator {
@@ -31,7 +32,8 @@ impl Emulator {
             cpu,
             ppu: ppu_rc,
             cycle_count: 0,
-            keypad
+            keypad,
+            nmi: false,
         }
     }
 
@@ -41,16 +43,15 @@ impl Emulator {
 
     pub fn frame(&mut self) {
         loop {
-            let cycle = self.cpu.run();
+            let cycle = self.cpu.run(&mut self.nmi);
             self.cycle_count += cycle;
-            self.ppu.borrow_mut().run(cycle * 3);
+            self.ppu.borrow_mut().run(cycle * 3, &mut self.nmi);
 
             if self.cycle_count >= 29781 {
                 self.cycle_count = self.cycle_count % 29781;
                 break;
             }
         }
-        // println!("{:?}", self.cpu);
     }
 
     pub fn get_graphic_buffer(&self) -> Vec<u32> {
