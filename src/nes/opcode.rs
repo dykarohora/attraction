@@ -3,6 +3,7 @@ use std::fmt::Formatter;
 
 #[derive(Debug)]
 pub enum AddressingMode {
+    Accumulator,
     Immediate,
     Absolute,
     Zeropage,
@@ -17,6 +18,7 @@ pub enum AddressingMode {
 
 #[derive(Debug)]
 pub enum Addressing {
+    Accumulator,
     Immediate(u16),
     Absolute(u16),
     Zeropage(u16),
@@ -62,12 +64,18 @@ pub enum Instruction {
     INX { cycle: u16 },
     INY { cycle: u16 },
 
-    // スタック命令
+    LSR { addressing: Addressing, cycle: u16},
+    ORA { addressing: Addressing, cycle: u16},
+    ROL { addressing: Addressing, cycle: u16},
+    ROR { addressing: Addressing, cycle: u16},
+    SBC { addressing: Addressing, cycle: u16},
 
+    // スタック命令
+    PHA { cycle: u16 },
     // ジャンプ命令
     JMP { addressing: Addressing, cycle: u16 },
-    JSR { cycle: u16},
-    RTS { cycle: u16},
+    JSR { cycle: u16 },
+    RTS { cycle: u16 },
 
     // 分岐命令
     BCC { cycle: u16 },

@@ -26,7 +26,8 @@ impl KeyPad {
                     self.input_player2.latch();
                 }
             }
-            _ => panic!("invalid operation")
+            // _ => panic!("invalid operation")
+            _ => {}
         }
     }
 

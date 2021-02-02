@@ -2,8 +2,8 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
-use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK};
+use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed, Accumulator};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR};
 use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
@@ -71,11 +71,11 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        print!("{:#06X} ", self.pc);
         if *nmi {
             self.process_nmi();
             *nmi = false;
         }
+        print!("{:#06X} ", self.pc);
         let opcode = self.fetch_byte();
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
@@ -127,6 +127,7 @@ impl Cpu {
                 let base_address = byte.wrapping_add(self.x) as u16;
                 self.read_word(base_address)
             }
+            _ => panic!("Invalid operation")
         }
     }
 
@@ -136,12 +137,15 @@ impl Cpu {
             0x10 => BPL { cycle: 2 },
             0x20 => JSR { cycle: 6 },
             0x29 => AND { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x48 => PHA { cycle: 3 },
+            0x4A => LSR { addressing: Accumulator, cycle: 2 },
             0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
             0x60 => RTS { cycle: 6 },
             0x78 => SEI { cycle: 2 },
             0x84 => STY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x88 => DEY { cycle: 2 },
+            0x8A => TXA { cycle: 2 },
             0x8C => STY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
             0x8D => STA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
             0x8E => STX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
@@ -165,9 +169,12 @@ impl Cpu {
             0xD0 => BNE { cycle: 2 },
             0xD8 => CLD { cycle: 2 },
             0xE0 => CPX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xE6 => INC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
             0xE8 => INX { cycle: 2 },
             0xEE => INC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0xF0 => BEQ { cycle: 2 },
+            0xF6 => INC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0xFE => INC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 6 },
             _ => panic!("[CPU] Not implemented opcode: {:#04X}", opcode)
         }
     }
@@ -248,6 +255,10 @@ impl Cpu {
                     => self.stx(operand),
                     _ => panic!("Invalid Operation STY addressing: {:?}", addressing)
                 }
+                cycle
+            }
+            TXA { cycle } => {
+                self.txa();
                 cycle
             }
             TXS { cycle } => {
@@ -338,6 +349,17 @@ impl Cpu {
                 self.inx();
                 cycle
             }
+            LSR { addressing, cycle, .. } => {
+                match addressing {
+                    Accumulator => self.lsr_accumulator(),
+                    _ => panic!("Not implemented LSR")
+                }
+                cycle
+            }
+            PHA { cycle } => {
+                self.pha();
+                cycle
+            }
             JMP { addressing, cycle, .. } => {
                 match addressing {
                     Absolute(operand) |
@@ -415,6 +437,10 @@ impl Cpu {
         self.write_byte(operand, self.y);
     }
 
+    fn txa(&mut self) {
+        self.a = self.x;
+    }
+
     fn txs(&mut self) {
         self.sp = self.x;
     }
@@ -485,6 +511,18 @@ impl Cpu {
         self.x = self.x.wrapping_add(1);
         self.update_negative_flag(self.x);
         self.update_zero_flag(self.x);
+    }
+
+    fn lsr_accumulator(&mut self) {
+        let acc = self.a;
+        self.status.carry = if (acc & 0x01) == 1 { true } else { false };
+        self.a = acc >> 1;
+        self.update_zero_flag(self.a);
+    }
+
+    // スタック命令
+    fn pha(&mut self) {
+        self.push_to_stack(self.a);
     }
 
     // ジャンプ命令
