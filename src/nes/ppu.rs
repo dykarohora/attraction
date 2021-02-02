@@ -23,7 +23,6 @@ impl PpuCtrlRegister {
         self.base_background_pattern_address = if byte & 0b0001_0000 == 0b0001_0000 { 0x1000 } else { 0x0000 };
         self.base_sprite_pattern_address = if byte & 0b0000_1000 == 0b0000_1000 { 0x1000 } else { 0x0000 };
         self.ppu_address_inc_size = if byte & 0b0000_0100 == 0b0000_0100 { 32 } else { 1 };
-        self.is_generate_nmi_when_vblank = if byte & 0b0000_0011 == 0b0000_0010 { true } else { false };
 
         self.base_name_table_address = match byte & 0b0000_0011 {
             0b00 => { 0x2000 }
@@ -146,7 +145,8 @@ impl Ppu {
 
         for i in 0..32 {
             // ネームテーブルからスプライト番号を取得する
-            let sprite_index = self.bus.read_byte((line_no * 32 + i) + 0x2000);
+            // let sprite_index = self.bus.read_byte((line_no * 32 + i) + 0x2000);
+            let sprite_index = self.bus.read_byte((line_no * 32 + i) + self.ctrl_register.base_name_table_address);
             // キャラクタROMからスプライトデータを取得する
 
             sprite.clear();
@@ -160,7 +160,8 @@ impl Ppu {
             // TODO ここ結構無駄
             let attribute_pos = (line_no / 4) * 8 + (i / 4);
             // 属性テーブルからアトリビュート取り出す
-            let attribute = self.bus.read_byte(attribute_pos + 0x23C0);
+            // let attribute = self.bus.read_byte(attribute_pos + 0x23C0);
+            let attribute = self.bus.read_byte(attribute_pos + self.ctrl_register.base_name_table_address + 0x03C0);
 
             // タイルがブロックのうち、どこに該当するかを調べる
             let block_id = match line_no % 4 {

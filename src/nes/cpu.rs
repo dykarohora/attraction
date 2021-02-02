@@ -71,9 +71,24 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
+        print!("{:#06X} ", self.pc);
+        if *nmi {
+            self.process_nmi();
+            *nmi = false;
+        }
         let opcode = self.fetch_byte();
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
+    }
+
+    fn process_nmi(&mut self) {
+        self.status.break_flg = false;
+        let program_counter = self.pc;
+        self.push_to_stack(((program_counter >> 8) & 0x00ff) as u8);
+        self.push_to_stack((program_counter & 0x00ff) as u8);
+        self.push_status_to_stack();
+        self.status.interrupt = true;
+        self.pc = self.read_word(0xfffa);
     }
 
     fn resolve_addressing(&mut self, addressing: AddressingMode) -> u16 {
@@ -133,9 +148,13 @@ impl Cpu {
             0x91 => STA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 6 },
             0x9A => TXS { cycle: 2 },
             0xA0 => LDY { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA1 => LDA { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
             0xA2 => LDX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA5 => LDA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0xA9 => LDA { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0xAD => LDA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
+            0xAD => LDA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xB1 => LDA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+            0xB5 => LDA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
             0xB9 => LDA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
             0xBD => LDA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
             0xC6 => DEC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
