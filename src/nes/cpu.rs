@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed, Accumulator};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS};
 use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
@@ -85,7 +85,7 @@ impl Cpu {
             self.process_nmi();
             *nmi = false;
         }
-        print!("{:#06X} ", self.pc);
+        print!("{:#06X} A:{:#04X} X:{:#04X} Y:{:#04X} ", self.pc, self.a, self.x, self.y);
         let opcode = self.fetch_byte();
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
@@ -153,6 +153,7 @@ impl Cpu {
             0x29 => AND { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0x2D => AND { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
             0x2E => ROL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0x30 => BMI { cycle: 2 },
             0x31 => AND { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
             0x36 => ROL { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
             0x38 => SEC { cycle: 2 },
@@ -165,6 +166,7 @@ impl Cpu {
             0x45 => EOR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x48 => PHA { cycle: 3 },
             0x49 => EOR { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x50 => BVC { cycle: 2 },
             0x4A => LSR { addressing: Accumulator, cycle: 2 },
             0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
             0x4D => EOR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
@@ -174,8 +176,17 @@ impl Cpu {
             0x59 => EOR { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
             0x5D => EOR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
             0x60 => RTS { cycle: 6 },
+            0x61 => ADC { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0x65 => ADC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x68 => PLA { cycle: 4 },
+            0x69 => ADC { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x6D => ADC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x70 => BVS { cycle: 2 },
+            0x71 => ADC { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+            0x75 => ADC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
             0x78 => SEI { cycle: 2 },
+            0x79 => ADC { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0x7D => ADC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
             0x84 => STY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x86 => STX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
@@ -184,6 +195,7 @@ impl Cpu {
             0x8C => STY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
             0x8D => STA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
             0x8E => STX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x90 => BCC { cycle: 2 },
             0x91 => STA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 6 },
             0x96 => STX { addressing: ZeropageY(self.resolve_addressing(AddressingMode::ZeropageY)), cycle: 4 },
             0x98 => TYA { cycle: 2 },
@@ -196,6 +208,7 @@ impl Cpu {
             0xA9 => LDA { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xAA => TAX { cycle: 2 },
             0xAD => LDA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xB0 => BCS { cycle: 2 },
             0xB1 => LDA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
             0xB5 => LDA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
             0xB8 => CLV { cycle: 2 },
@@ -204,6 +217,7 @@ impl Cpu {
             0xBD => LDA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
             0xC6 => DEC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
             0xC5 => CMP { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xC8 => INY { cycle: 2 },
             0xC9 => CMP { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xCA => DEX { cycle: 2 },
             0xCE => DEC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
@@ -323,6 +337,21 @@ impl Cpu {
                 self.tya();
                 cycle
             }
+            ADC { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    IndirectIndexed(operand) |
+                    IndexedIndirect(operand)
+                    => self.adc(operand),
+                    _ => panic!("Invalid Operation ADC addressing: {:?}", addressing)
+                }
+                cycle
+            }
             AND { addressing, cycle, .. } => {
                 match addressing {
                     Immediate(operand) |
@@ -422,6 +451,10 @@ impl Cpu {
                 self.inx();
                 cycle
             }
+            INY { cycle } => {
+                self.iny();
+                cycle
+            }
             LSR { addressing, cycle, .. } => {
                 match addressing {
                     Accumulator => self.lsr_accumulator(),
@@ -470,8 +503,20 @@ impl Cpu {
                 self.rti();
                 cycle
             }
+            BCC { cycle } => {
+                self.bcc();
+                cycle
+            }
+            BCS { cycle } => {
+                self.bcs();
+                cycle
+            }
             BEQ { cycle } => {
                 self.beq();
+                cycle
+            }
+            BMI { cycle } => {
+                self.bmi();
                 cycle
             }
             BNE { cycle } => {
@@ -480,6 +525,14 @@ impl Cpu {
             }
             BPL { cycle } => {
                 self.bpl();
+                cycle
+            }
+            BVC { cycle } => {
+                self.bvc();
+                cycle
+            }
+            BVS { cycle } => {
+                self.bvs();
                 cycle
             }
             CLC { cycle } => {
@@ -586,6 +639,22 @@ impl Cpu {
     }
 
     // 算術命令
+    fn adc(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let carry: u8 = if self.status.carry == true { 0x01 } else { 0x00 };
+        let result = self.a.wrapping_add(byte).wrapping_add(carry);
+
+        if result > 0xff {
+            self.status.carry = true
+        }
+
+        self.update_overflow_flag(self.a, byte, result);
+
+        self.a = result;
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
+    }
+
     fn and(&mut self, operand: u16) {
         self.a &= self.read_byte(operand);
         self.update_negative_flag(self.a);
@@ -660,6 +729,12 @@ impl Cpu {
         self.update_zero_flag(self.x);
     }
 
+    fn iny(&mut self) {
+        self.y = self.y.wrapping_add(1);
+        self.update_negative_flag(self.y);
+        self.update_zero_flag(self.y);
+    }
+
     fn lsr_accumulator(&mut self) {
         let acc = self.a;
         self.status.carry = if (acc & 0x01) == 1 { true } else { false };
@@ -726,10 +801,61 @@ impl Cpu {
         self.pc = (high << 8) | low;
     }
     // 分岐命令
+    fn bcc(&mut self) {
+        let mut offset = self.fetch_byte();
+
+        if self.status.carry == false {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    // self.pc.wrapping_sub(offset as u16)
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            };
+        }
+    }
+
+    fn bcs(&mut self) {
+        let mut offset = self.fetch_byte();
+
+        if self.status.carry == true {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    // self.pc.wrapping_sub(offset as u16)
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            };
+        }
+    }
+
     fn beq(&mut self) {
         let mut offset = self.fetch_byte();
 
         if self.status.zero == true {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    // self.pc.wrapping_sub(offset as u16)
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            };
+        }
+    }
+
+    fn bmi(&mut self) {
+        let mut offset = self.fetch_byte();
+
+        if self.status.negative == true {
             let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
 
             match is_negative {
@@ -763,6 +889,38 @@ impl Cpu {
         let mut offset = self.fetch_byte();
 
         if self.status.negative == false {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            }
+        }
+    }
+
+    fn bvc(&mut self) {
+        let mut offset = self.fetch_byte();
+
+        if self.status.overflow == false {
+            let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
+
+            match is_negative {
+                true => {
+                    offset = !offset + 1;
+                    self.pc -= offset as u16
+                }
+                false => { self.pc += offset as u16 }
+            }
+        }
+    }
+
+    fn bvs(&mut self) {
+        let mut offset = self.fetch_byte();
+
+        if self.status.overflow == true {
             let is_negative = (offset & 0b1000_0000) == 0b1000_0000;
 
             match is_negative {
@@ -871,6 +1029,19 @@ impl Cpu {
 
     fn update_zero_flag(&mut self, calculation_result: u8) {
         self.status.zero = if calculation_result == 0 { true } else { false };
+    }
+
+    fn update_overflow_flag(&mut self, target: u8, added_byte: u8, calculation_result: u8) {
+        if (target ^ added_byte) & 0x80 != 0x00 {
+            self.status.overflow = false;
+            return;
+        }
+
+        if (target ^ calculation_result) & 0x80 != 0x80 {
+            self.status.overflow = false
+        } else {
+            self.status.overflow = true
+        }
     }
 }
 

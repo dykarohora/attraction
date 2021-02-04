@@ -16,7 +16,6 @@ pub enum AddressingMode {
     IndexedIndirect,
 }
 
-#[derive(Debug)]
 pub enum Addressing {
     Accumulator,
     Immediate(u16),
@@ -30,6 +29,38 @@ pub enum Addressing {
     IndirectIndexed(u16),
     IndexedIndirect(u16),
 }
+
+impl fmt::Debug for Addressing {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            Addressing::Accumulator =>
+                write!(f, "Accumulator"),
+            Addressing::Immediate(addr) =>
+                write!(f, "Immediate {:#06X}", addr),
+            Addressing::Absolute(addr) =>
+                write!(f, "Absolute {:#06X}", addr),
+            Addressing::Zeropage(addr) =>
+                write!(f, "Zeropage {:#06X}", addr),
+            Addressing::AbsoluteX(addr) =>
+                write!(f, "AbsoluteX {:#06X}", addr),
+            Addressing::AbsoluteY(addr) =>
+                write!(f, "AbsoluteY {:#06X}", addr),
+            Addressing::ZeropageX(addr) =>
+                write!(f, "ZeropageX {:#06X}", addr),
+            Addressing::ZeropageY(addr) =>
+                write!(f, "ZeropageY {:#06X}", addr),
+            Addressing::Indirect(addr) =>
+                write!(f, "Indirect {:#06X}", addr),
+            Addressing::IndirectIndexed(addr) =>
+                write!(f, "IndirectIndexed {:#06X}", addr),
+            Addressing::IndexedIndirect(addr) =>
+                write!(f, "IndexedIndirect {:#06X}", addr)
+        }
+    }
+}
+
+
+// TODO デバッグ
 
 #[derive(Debug)]
 pub enum Instruction {
