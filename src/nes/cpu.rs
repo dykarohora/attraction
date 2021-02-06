@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed, Accumulator};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY};
 use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
@@ -30,14 +30,14 @@ struct Status {
 
 impl fmt::Debug for Status {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let n = if self.negative == true {"N"} else {" "};
-        let v = if self.overflow == true {"V"} else {" "};
-        let b = if self.break_flg == true {"B"} else {" "};
-        let d = if self.decimal == true {"D"} else {" "};
-        let i = if self.interrupt == true {"I"} else {" "};
-        let z = if self.zero == true {"Z"} else {" "};
-        let c = if self.carry == true {"C"} else {" "};
-        write!(f, "{}{}{}{}{}{}{}", n, v, b, d ,i ,z ,c)
+        let n = if self.negative == true { "N" } else { " " };
+        let v = if self.overflow == true { "V" } else { " " };
+        let b = if self.break_flg == true { "B" } else { " " };
+        let d = if self.decimal == true { "D" } else { " " };
+        let i = if self.interrupt == true { "I" } else { " " };
+        let z = if self.zero == true { "Z" } else { " " };
+        let c = if self.carry == true { "C" } else { " " };
+        write!(f, "{}{}{}{}{}{}{}", n, v, b, d, i, z, c)
     }
 }
 
@@ -101,7 +101,7 @@ impl Cpu {
             self.process_nmi();
             *nmi = false;
         }
-        print!("{:#06X} A:{:#04X} X:{:#04X} Y:{:#04X} SP:{:#04X} P:{:?} - ", self.pc, self.a, self.x, self.y, self.sp ,self.status);
+        print!("{:#06X} A:{:#04X} X:{:#04X} Y:{:#04X} SP:{:#04X} P:{:?} - ", self.pc, self.a, self.x, self.y, self.sp, self.status);
         let opcode = self.fetch_byte();
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
@@ -159,94 +159,171 @@ impl Cpu {
 
     fn decode_instruction(&mut self, opcode: u8) -> Instruction {
         match opcode {
-            0x00 => BRK { cycle: 7 },
-            0x10 => BPL { cycle: 2 },
-            0x18 => CLC { cycle: 2 },
-            0x20 => JSR { cycle: 6 },
-            0x21 => AND { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
-            0x25 => AND { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x26 => ROL { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            // 転送命令 comp
+            0xA9 => LDA { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA5 => LDA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xB5 => LDA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0xAD => LDA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xB9 => LDA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0xBD => LDA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0xA1 => LDA { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0xB1 => LDA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+
+            0xA2 => LDX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA6 => LDX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xB6 => LDX { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0xAE => LDX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xBE => LDX { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+
+            0xA0 => LDX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA4 => LDX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xB4 => LDX { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0xAC => LDX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xBC => LDX { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+
+            0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x95 => STA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0x8D => STA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x9D => STA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 5 },
+            0x99 => STA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 5 },
+            0x81 => STA { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0x91 => STA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 6 },
+
+            0x86 => STX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x96 => STX { addressing: ZeropageY(self.resolve_addressing(AddressingMode::ZeropageY)), cycle: 4 },
+            0x8E => STX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+
+            0x84 => STY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x94 => STY { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0x8C => STY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+
+            0xAA => TAX { cycle: 2 },
+            0xA8 => TAY { cycle: 2 },
+            0xBA => TSX { cycle: 2 },
+            0x8A => TXA { cycle: 2 },
+            0x9A => TXS { cycle: 2 },
+            0x98 => TYA { cycle: 2 },
+
+            // 算術命令
+            0x69 => ADC { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x65 => ADC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x75 => ADC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0x6D => ADC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x7D => ADC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0x79 => ADC { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0x61 => ADC { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0x71 => ADC { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+
             0x29 => AND { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0x2D => AND { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0x2E => ROL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
-            0x30 => BMI { cycle: 2 },
-            0x31 => AND { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
-            0x36 => ROL { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
-            0x38 => SEC { cycle: 2 },
-            0x39 => AND { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0x25 => AND { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x35 => AND { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0x2D => AND { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
             0x3D => AND { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
-            0x3E => ROL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
-            0x40 => RTI { cycle: 6 },
-            0x41 => EOR { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
-            0x45 => EOR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x48 => PHA { cycle: 3 },
+            0x39 => AND { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0x21 => AND { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0x31 => AND { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+
+            0x0A => ASL { addressing: Accumulator, cycle: 2 },
+            0x06 => ASL { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0x16 => ASL { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0x0E => ASL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0x1E => ASL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
+            0xC9 => CMP { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xC5 => CMP { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xD5 => CMP { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0xCD => CMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xDD => CMP { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0xD9 => CMP { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0xC1 => CMP { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0xD1 => CMP { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+
+            0xE0 => CPX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xE4 => CPX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xEC => CPX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+
+            0xC0 => CPY { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xC4 => CPY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xCC => CPY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+
+            0xC6 => DEC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0xD6 => DEC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0xCE => DEC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0xDE => DEC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
+            0xCA => DEX { cycle: 2 },
+            0x88 => DEY { cycle: 2 },
+
             0x49 => EOR { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0x50 => BVC { cycle: 2 },
-            0x4A => LSR { addressing: Accumulator, cycle: 2 },
-            0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
-            0x4D => EOR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0x51 => EOR { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+            0x45 => EOR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x55 => EOR { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
-            0x58 => CLI { cycle: 2 },
+            0x4D => EOR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
             0x59 => EOR { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
             0x5D => EOR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
-            0x60 => RTS { cycle: 6 },
-            0x61 => ADC { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
-            0x65 => ADC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x68 => PLA { cycle: 4 },
-            0x69 => ADC { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0x6D => ADC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0x70 => BVS { cycle: 2 },
-            0x71 => ADC { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
-            0x75 => ADC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
-            0x78 => SEI { cycle: 2 },
-            0x79 => ADC { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
-            0x7D => ADC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
-            0x84 => STY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x86 => STX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x88 => DEY { cycle: 2 },
-            0x8A => TXA { cycle: 2 },
-            0x8C => STY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
-            0x8D => STA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0x8E => STX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0x90 => BCC { cycle: 2 },
-            0x91 => STA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 6 },
-            0x96 => STX { addressing: ZeropageY(self.resolve_addressing(AddressingMode::ZeropageY)), cycle: 4 },
-            0x98 => TYA { cycle: 2 },
-            0x9A => TXS { cycle: 2 },
-            0xA0 => LDY { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0xA1 => LDA { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
-            0xA2 => LDX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0xA5 => LDA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0xA8 => TAY { cycle: 2 },
-            0xA9 => LDA { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0xAA => TAX { cycle: 2 },
-            0xAD => LDA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0xB0 => BCS { cycle: 2 },
-            0xB1 => LDA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
-            0xB5 => LDA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
-            0xB8 => CLV { cycle: 2 },
-            0xB9 => LDA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
-            0xBA => TSX { cycle: 2 },
-            0xBD => LDA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
-            0xC6 => DEC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
-            0xC5 => CMP { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0xC8 => INY { cycle: 2 },
-            0xC9 => CMP { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0xCA => DEX { cycle: 2 },
-            0xCE => DEC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
-            0xD0 => BNE { cycle: 2 },
-            0xD8 => CLD { cycle: 2 },
-            0xE0 => CPX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x41 => EOR { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0x51 => EOR { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+
             0xE6 => INC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
-            0xE8 => INX { cycle: 2 },
-            0xEE => INC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
-            0xF0 => BEQ { cycle: 2 },
             0xF6 => INC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0xEE => INC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0xFE => INC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
+            0xE8 => INX { cycle: 2 },
+
+            0xC8 => INY { cycle: 2 },
+
+            0x4A => LSR { addressing: Accumulator, cycle: 2 },
+            0x46 => LSR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0x56 => LSR { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0x4E => LSR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0x5E => LSR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
+            0x6A => ROR { addressing: Accumulator, cycle: 5 },
+            0x66 => ROR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0x76 => ROR { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0x6E => ROR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0x7E => ROR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
+            0x2A => ROL { addressing: Accumulator, cycle: 5 },
+            0x26 => ROL { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0x36 => ROL { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0x2E => ROL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0x3E => ROL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
+            // スタック命令
+            0x48 => PHA { cycle: 3 },
+            0x68 => PLA { cycle: 4 },
+
+            // ジャンプ命令 comp
+            0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
+            0x6C => JMP { addressing: Indirect(self.resolve_addressing(AddressingMode::Indirect)), cycle: 5 },
+            0x20 => JSR { cycle: 6 },
+            0x60 => RTS { cycle: 6 },
+            0x40 => RTI { cycle: 6 },
+
+            // 分岐命令 comp
+            0x90 => BCC { cycle: 2 },
+            0xB0 => BCS { cycle: 2 },
+            0xF0 => BEQ { cycle: 2 },
+            0x30 => BMI { cycle: 2 },
+            0xD0 => BNE { cycle: 2 },
+            0x10 => BPL { cycle: 2 },
+            0x50 => BVC { cycle: 2 },
+            0x70 => BVS { cycle: 2 },
+
+            // フラグ変更命令 comp
+            0x18 => CLC { cycle: 2 },
+            0xD8 => CLD { cycle: 2 },
+            0x58 => CLI { cycle: 2 },
+            0xB8 => CLV { cycle: 2 },
+            0x38 => SEC { cycle: 2 },
             0xF8 => SED { cycle: 2 },
-            0xFE => INC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 6 },
+            0x78 => SEI { cycle: 2 },
+
+            // その他 comp
+            0x00 => BRK { cycle: 7 },
+            0xEA => NOP { cycle: 2 },
+
             _ => panic!("[CPU] Not implemented opcode: {:#04X}", opcode)
         }
     }
@@ -383,6 +460,18 @@ impl Cpu {
                 }
                 cycle
             }
+            ASL { addressing, cycle, .. } => {
+                match addressing {
+                    Accumulator => self.asl_accumulator(),
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand)
+                    => self.asl(operand),
+                    _ => panic!("Invalid Operation ASL addressing: {:?}", addressing)
+                }
+                cycle
+            }
             CMP { addressing, cycle, .. } => {
                 match addressing {
                     Immediate(operand) |
@@ -474,18 +563,36 @@ impl Cpu {
             LSR { addressing, cycle, .. } => {
                 match addressing {
                     Accumulator => self.lsr_accumulator(),
-                    _ => panic!("Not implemented LSR")
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand)
+                    => self.lsr(operand),
+                    _ => panic!("Invalid Operation LSR addressing: {:?}", addressing)
                 }
                 cycle
             }
             ROL { addressing, cycle, .. } => {
                 match addressing {
+                    Accumulator => self.rol_accumulator(),
                     Zeropage(operand) |
                     ZeropageX(operand) |
                     Absolute(operand) |
                     AbsoluteX(operand)
                     => self.rol(operand),
                     _ => panic!("Invalid Operation ROL addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            ROR { addressing, cycle, .. } => {
+                match addressing {
+                    Accumulator => self.ror_accumulator(),
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand)
+                    => self.ror(operand),
+                    _ => panic!("Invalid Operation ROR addressing: {:?}", addressing)
                 }
                 cycle
             }
@@ -583,6 +690,9 @@ impl Cpu {
                 self.brk();
                 cycle
             }
+            NOP { cycle } => {
+                cycle
+            }
             _ => panic!("not implemented")
         }
     }
@@ -660,12 +770,13 @@ impl Cpu {
         let carry: u8 = if self.status.carry == true { 0x01 } else { 0x00 };
         let result = self.a.wrapping_add(byte).wrapping_add(carry);
 
-        if result > 0xff {
-            self.status.carry = true
+        if self.a > result {
+            self.status.carry = true;
+        } else {
+            self.status.carry = false;
         }
 
         self.update_overflow_flag(self.a, byte, result);
-
         self.a = result;
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
@@ -675,6 +786,25 @@ impl Cpu {
         self.a &= self.read_byte(operand);
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
+    }
+
+    fn asl_accumulator(&mut self) {
+        self.a = self.asl_calc(self.a);
+    }
+
+    fn asl(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let result = self.asl_calc(byte);
+        self.write_byte(operand, result);
+    }
+
+    fn asl_calc(&mut self, target_byte: u8) -> u8 {
+        // 左シフトなので計算対象のbit7が1ならば、桁上がりが発生したと言える
+        self.status.carry = if target_byte & 0x80 == 0x80 { true } else { false };
+        let result = target_byte << 1;
+        self.update_zero_flag(result);
+        self.update_negative_flag(result);
+        result
     }
 
     fn cmp(&mut self, operand: u16) {
@@ -752,29 +882,59 @@ impl Cpu {
     }
 
     fn lsr_accumulator(&mut self) {
-        let acc = self.a;
-        self.status.carry = if (acc & 0x01) == 1 { true } else { false };
-        self.a = acc >> 1;
-        self.update_negative_flag(self.a);
-        self.update_zero_flag(self.a);
+        self.a = self.lsr_calc(self.a);
+    }
+
+    fn lsr(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let result = self.lsr_calc(byte);
+        self.write_byte(operand, result);
+    }
+
+    fn lsr_calc(&mut self, target_byte: u8) -> u8 {
+        self.status.carry = if target_byte & 0x01 == 0x01 { true } else { false };
+        let result = target_byte >> 1;
+        self.update_zero_flag(result);
+        self.update_negative_flag(result);
+        result
+    }
+
+    fn rol_accumulator(&mut self) {
+        self.a = self.rol_calc(self.a);
     }
 
     fn rol(&mut self, operand: u16) {
-        let mut byte = self.read_byte(operand);
-        byte = byte << 1;
+        let byte = self.read_byte(operand);
+        let result = self.rol_calc(byte);
+        self.write_byte(operand, result);
+    }
 
-        if self.status.carry == true {
-            byte += 1;
-        }
+    fn rol_calc(&mut self, target_byte: u8) -> u8 {
+        let after_carry_flag = if target_byte & 0x80 == 0x80 { true } else { false };
+        let result = (target_byte << 1) | if self.status.carry == true { 0x01 } else { 0x00 };
+        self.update_zero_flag(result);
+        self.update_negative_flag(result);
+        self.status.carry = after_carry_flag;
+        result
+    }
 
-        self.write_byte(operand, byte);
-        if byte & 0b1000_0000 == 0b1000_0000 {
-            self.status.carry = true
-        } else {
-            self.status.carry = false
-        }
-        self.update_zero_flag(byte);
-        self.update_negative_flag(byte);
+    fn ror_accumulator(&mut self) {
+        self.a = self.ror_calc(self.a);
+    }
+
+    fn ror(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let result = self.ror_calc(byte);
+        self.write_byte(operand, result);
+    }
+
+    fn ror_calc(&mut self, target_byte: u8) -> u8 {
+        let after_carry_flag = if target_byte & 0x01 == 0x01 { true } else { false };
+        let result = (target_byte >> 1) | if self.status.carry == true { 0x80 } else { 0x80 };
+        self.update_zero_flag(result);
+        self.update_negative_flag(result);
+        self.status.carry = after_carry_flag;
+        result
     }
 
     // スタック命令
@@ -816,6 +976,7 @@ impl Cpu {
         let high = self.pop_from_stack() as u16;
         self.pc = (high << 8) | low;
     }
+
     // 分岐命令
     fn bcc(&mut self) {
         let mut offset = self.fetch_byte();
