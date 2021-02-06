@@ -17,7 +17,7 @@ pub struct Cpu {
     bus: CpuBus,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 struct Status {
     negative: bool,
     overflow: bool,
@@ -26,6 +26,19 @@ struct Status {
     interrupt: bool,
     zero: bool,
     carry: bool,
+}
+
+impl fmt::Debug for Status {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let n = if self.negative == true {"N"} else {" "};
+        let v = if self.overflow == true {"V"} else {" "};
+        let b = if self.break_flg == true {"B"} else {" "};
+        let d = if self.decimal == true {"D"} else {" "};
+        let i = if self.interrupt == true {"I"} else {" "};
+        let z = if self.zero == true {"Z"} else {" "};
+        let c = if self.carry == true {"C"} else {" "};
+        write!(f, "{}{}{}{}{}{}{}", n, v, b, d ,i ,z ,c)
+    }
 }
 
 impl Status {
@@ -74,18 +87,21 @@ impl Cpu {
     }
 
     pub fn reset(&mut self) {
-        self.status.break_flg = true;
         self.status.interrupt = true;
         self.sp = 0xFD;
         self.pc = self.read_word(0xFFFC);
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
+        if self.pc == 0xC306 {
+            println!();
+        }
         if *nmi {
+            println!("Enter NMI");
             self.process_nmi();
             *nmi = false;
         }
-        print!("{:#06X} A:{:#04X} X:{:#04X} Y:{:#04X} ", self.pc, self.a, self.x, self.y);
+        print!("{:#06X} A:{:#04X} X:{:#04X} Y:{:#04X} SP:{:#04X} P:{:?} - ", self.pc, self.a, self.x, self.y, self.sp ,self.status);
         let opcode = self.fetch_byte();
         let instruction = self.decode_instruction(opcode);
         self.execute_instruction(instruction)
@@ -125,17 +141,17 @@ impl Cpu {
                 let word = self.fetch_word();
                 self.read_word(word)
             }
-            IndirectIndexed => {
-                let byte = self.fetch_byte() as u16;
-                let high = self.read_byte(byte) as u16;
-                let low = self.read_byte(byte + 1) as u16;
-                let address = ((high << 8) | low).wrapping_add(self.y as u16);
-                address
-            }
             IndexedIndirect => {
                 let byte = self.fetch_byte();
                 let base_address = byte.wrapping_add(self.x) as u16;
                 self.read_word(base_address)
+            }
+            IndirectIndexed => {
+                let byte = self.fetch_byte() as u16;
+                let low = self.read_byte(byte) as u16;
+                let high = self.read_byte(byte + 1) as u16;
+                let address = ((high << 8) | low).wrapping_add(self.y as u16);
+                address
             }
             _ => panic!("Invalid operation")
         }
