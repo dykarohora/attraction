@@ -93,7 +93,7 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xC306 {
+        if self.pc == 0xC5B0 {
             println!();
         }
         if *nmi {

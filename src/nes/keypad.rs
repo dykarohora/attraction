@@ -15,7 +15,7 @@ impl KeyPad {
     }
 
     pub fn write_byte(&mut self, byte: u8) {
-        match byte {
+        match byte & 0x01 {
             0x01 => {
                 self.is_ready_latch = true
             }
