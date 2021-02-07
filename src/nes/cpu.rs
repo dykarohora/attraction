@@ -39,7 +39,7 @@ impl fmt::Debug for Status {
         let i = if self.interrupt == true { "I" } else { " " };
         let z = if self.zero == true { "Z" } else { " " };
         let c = if self.carry == true { "C" } else { " " };
-        write!(f, "{}{}{}{}{}{}{}", n, v, b, d, i, z, c)
+        write!(f, "{}{}{}{}{}{}{}{}", n, v, u, b, d, i, z, c)
     }
 }
 
@@ -99,6 +99,9 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
+        if self.pc == 0xCF63 {
+            println!("");
+        }
         if *nmi {
             println!("Enter NMI");
             self.process_nmi();
@@ -827,8 +830,6 @@ impl Cpu {
 
     fn txs(&mut self) {
         self.sp = self.x;
-        self.update_negative_flag(self.sp);
-        self.update_zero_flag(self.sp)
     }
 
     fn tya(&mut self) {
@@ -1008,7 +1009,8 @@ impl Cpu {
     }
 
     fn ror_accumulator(&mut self) {
-        self.a = self.ror_calc(self.a);
+        let result = self.ror_calc(self.a);
+        self.a = result;
     }
 
     fn ror(&mut self, operand: u16) {
@@ -1019,7 +1021,7 @@ impl Cpu {
 
     fn ror_calc(&mut self, target_byte: u8) -> u8 {
         let after_carry_flag = if target_byte & 0x01 == 0x01 { true } else { false };
-        let result = (target_byte >> 1) | if self.status.carry == true { 0x80 } else { 0x80 };
+        let result = (target_byte >> 1) | if self.status.carry == true { 0x80 } else { 0x00 };
         self.update_zero_flag(result);
         self.update_negative_flag(result);
         self.status.carry = after_carry_flag;
@@ -1059,6 +1061,7 @@ impl Cpu {
 
     fn plp(&mut self) {
         self.pop_status_from_stack();
+        self.status.unused = true;
     }
 
     // ジャンプ命令
@@ -1085,6 +1088,7 @@ impl Cpu {
 
     fn rti(&mut self) {
         self.pop_status_from_stack();
+        self.status.unused = true;
         let low = self.pop_from_stack() as u16;
         let high = self.pop_from_stack() as u16;
         self.pc = (high << 8) | low;
