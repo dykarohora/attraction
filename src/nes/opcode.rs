@@ -82,6 +82,7 @@ pub enum Instruction {
     ADC { addressing: Addressing, cycle: u16 },
     AND { addressing: Addressing, cycle: u16 },
     ASL { addressing: Addressing, cycle: u16 },
+    BIT { addressing: Addressing, cycle: u16 },
 
     CMP { addressing: Addressing, cycle: u16 },
     CPX { addressing: Addressing, cycle: u16 },
@@ -105,7 +106,9 @@ pub enum Instruction {
 
     // スタック命令
     PHA { cycle: u16 },
+    PHP { cycle: u16 },
     PLA { cycle: u16 },
+    PLP { cycle: u16 },
 
     // ジャンプ命令
     JMP { addressing: Addressing, cycle: u16 },
@@ -128,7 +131,6 @@ pub enum Instruction {
     CLD { cycle: u16 },
     CLI { cycle: u16 },
     CLV { cycle: u16 },
-
     SEC { cycle: u16 },
     SED { cycle: u16 },
     SEI { cycle: u16 },

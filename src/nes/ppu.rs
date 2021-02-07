@@ -332,8 +332,23 @@ impl Ppu {
         // PPU ADDRによって
         match self.ppu_addr {
             0x2000..=0x2FFF => self.bus.write_byte(self.ppu_addr, byte),
+            0x3000..=0x3EFF => self.bus.write_byte(self.ppu_addr - 0x1000, byte),
             0x3F00..=0x3F0F => self.write_background_palette(self.ppu_addr, byte),
             0x3F10..=0x3F1F => self.write_sprite_palette(self.ppu_addr, byte),
+            0x3F20..=0x3F2F => self.write_background_palette(self.ppu_addr - 0x0020, byte),
+            0x3F30..=0x3F3F => self.write_sprite_palette(self.ppu_addr - 0x0020, byte),
+            0x3F40..=0x3F4F => self.write_background_palette(self.ppu_addr - 0x0040, byte),
+            0x3F50..=0x3F5F => self.write_sprite_palette(self.ppu_addr - 0x0040, byte),
+            0x3F60..=0x3F6F => self.write_background_palette(self.ppu_addr - 0x0060, byte),
+            0x3F70..=0x3F7F => self.write_sprite_palette(self.ppu_addr - 0x0060, byte),
+            0x3F80..=0x3F8F => self.write_background_palette(self.ppu_addr - 0x0080, byte),
+            0x3F90..=0x3F9F => self.write_sprite_palette(self.ppu_addr - 0x0080, byte),
+            0x3FA0..=0x3FAF => self.write_background_palette(self.ppu_addr - 0x00A0, byte),
+            0x3FB0..=0x3FBF => self.write_sprite_palette(self.ppu_addr - 0x00A0, byte),
+            0x3FC0..=0x3FCF => self.write_background_palette(self.ppu_addr - 0x00C0, byte),
+            0x3FD0..=0x3FDF => self.write_sprite_palette(self.ppu_addr - 0x00C0, byte),
+            0x3FE0..=0x3FEF => self.write_background_palette(self.ppu_addr - 0x00E0, byte),
+            0x3FF0..=0x3FFF => self.write_sprite_palette(self.ppu_addr - 0x00E0, byte),
             _ => panic!("[Ppu] not implemented or invalid address: {:#06X} byte: {:#04X}", self.ppu_addr, byte)
         };
         // PPUDATAに書き込みが発生するとPPUADDRがインクリメントされる

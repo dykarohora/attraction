@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed, Accumulator};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP};
 use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
@@ -93,7 +93,7 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xC5B0 {
+        if self.pc == 0xC034 {
             println!();
         }
         if *nmi {
@@ -175,11 +175,11 @@ impl Cpu {
             0xAE => LDX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
             0xBE => LDX { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
 
-            0xA0 => LDX { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
-            0xA4 => LDX { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0xB4 => LDX { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
-            0xAC => LDX { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0xBC => LDX { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0xA0 => LDY { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xA4 => LDY { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xB4 => LDY { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0xAC => LDY { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xBC => LDY { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
 
             0x85 => STA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x95 => STA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
@@ -229,6 +229,9 @@ impl Cpu {
             0x0E => ASL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0x1E => ASL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
 
+            0x24 => BIT { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x2C => BIT { addressing: Absolute(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 4 },
+
             0xC9 => CMP { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xC5 => CMP { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0xD5 => CMP { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
@@ -258,8 +261,8 @@ impl Cpu {
             0x45 => EOR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0x55 => EOR { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
             0x4D => EOR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
-            0x59 => EOR { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
             0x5D => EOR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0x59 => EOR { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
             0x41 => EOR { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
             0x51 => EOR { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
 
@@ -278,6 +281,15 @@ impl Cpu {
             0x4E => LSR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0x5E => LSR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
 
+            0x09 => ORA { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0x05 => ORA { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0x15 => ORA { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0x0D => ORA { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0x1D => ORA { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0x19 => ORA { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0x01 => ORA { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0x11 => ORA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
+
             0x6A => ROR { addressing: Accumulator, cycle: 5 },
             0x66 => ROR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
             0x76 => ROR { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
@@ -290,9 +302,11 @@ impl Cpu {
             0x2E => ROL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0x3E => ROL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
 
-            // スタック命令
+            // スタック命令 comp
             0x48 => PHA { cycle: 3 },
+            0x08 => PHP { cycle: 3 },
             0x68 => PLA { cycle: 4 },
+            0x28 => PLP { cycle: 4 },
 
             // ジャンプ命令 comp
             0x4C => JMP { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 3 },
@@ -472,6 +486,15 @@ impl Cpu {
                 }
                 cycle
             }
+            BIT { addressing, cycle, .. } => {
+                match addressing {
+                    Zeropage(operand) |
+                    Absolute(operand)
+                    => self.bit(operand),
+                    _ => panic!("Invalid Operation BIT addressing: {:?}", addressing)
+                }
+                cycle
+            }
             CMP { addressing, cycle, .. } => {
                 match addressing {
                     Immediate(operand) |
@@ -572,6 +595,21 @@ impl Cpu {
                 }
                 cycle
             }
+            ORA { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    IndexedIndirect(operand) |
+                    IndirectIndexed(operand)
+                    => self.ora(operand),
+                    _ => panic!("Invalid Operation ORA addressing: {:?}", addressing)
+                }
+                cycle
+            }
             ROL { addressing, cycle, .. } => {
                 match addressing {
                     Accumulator => self.rol_accumulator(),
@@ -600,8 +638,16 @@ impl Cpu {
                 self.pha();
                 cycle
             }
+            PHP { cycle } => {
+                self.php();
+                cycle
+            }
             PLA { cycle } => {
                 self.pla();
+                cycle
+            }
+            PLP { cycle } => {
+                self.plp();
                 cycle
             }
             JMP { addressing, cycle, .. } => {
@@ -807,6 +853,17 @@ impl Cpu {
         result
     }
 
+    fn bit(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        // ネガティブフラグはbyteのbit7をストアする
+        self.status.negative = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
+        // オーバーフローフラグはbyteのbit6をストアする
+        self.status.overflow = if byte & 0b0100_0000 == 0b0100_0000 { true } else { false };
+        // ゼロフラグはAとのビット演算の結果、ゼロならばセットする
+        let result = self.a & byte;
+        self.update_zero_flag(result);
+    }
+
     fn cmp(&mut self, operand: u16) {
         self.compare(operand, self.a);
     }
@@ -899,6 +956,12 @@ impl Cpu {
         result
     }
 
+    fn ora(&mut self, operand: u16) {
+        self.a |= self.read_byte(operand);
+        self.update_zero_flag(self.a);
+        self.update_negative_flag(self.a);
+    }
+
     fn rol_accumulator(&mut self) {
         self.a = self.rol_calc(self.a);
     }
@@ -942,10 +1005,18 @@ impl Cpu {
         self.push_to_stack(self.a);
     }
 
+    fn php(&mut self) {
+        self.push_status_to_stack();
+    }
+
     fn pla(&mut self) {
         self.a = self.pop_from_stack();
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
+    }
+
+    fn plp(&mut self) {
+        self.pop_status_from_stack();
     }
 
     // ジャンプ命令
