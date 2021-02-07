@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Addressing, Instruction, AddressingMode};
 use crate::nes::opcode::Addressing::{Immediate, Absolute, Zeropage, AbsoluteX, AbsoluteY, ZeropageX, ZeropageY, Indirect, IndexedIndirect, IndirectIndexed, Accumulator};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC};
 use std::sync::atomic::compiler_fence;
 
 #[derive(Default)]
@@ -21,6 +21,7 @@ pub struct Cpu {
 struct Status {
     negative: bool,
     overflow: bool,
+    unused: bool,
     break_flg: bool,
     decimal: bool,
     interrupt: bool,
@@ -32,6 +33,7 @@ impl fmt::Debug for Status {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let n = if self.negative == true { "N" } else { " " };
         let v = if self.overflow == true { "V" } else { " " };
+        let u = if self.unused == true { "U" } else { " " };
         let b = if self.break_flg == true { "B" } else { " " };
         let d = if self.decimal == true { "D" } else { " " };
         let i = if self.interrupt == true { "I" } else { " " };
@@ -46,6 +48,7 @@ impl Status {
         let mut binary = 0b0000_0000;
         binary = binary | if self.negative == true { 0b1000_0000 } else { 0b0000_0000 };
         binary = binary | if self.overflow == true { 0b0100_0000 } else { 0b0000_0000 };
+        binary = binary | if self.unused == true { 0b0010_0000 } else { 0b0000_0000 };
         binary = binary | if self.break_flg == true { 0b0001_0000 } else { 0b0000_0000 };
         binary = binary | if self.decimal == true { 0b0000_1000 } else { 0b0000_0000 };
         binary = binary | if self.interrupt == true { 0b0000_0100 } else { 0b0000_0000 };
@@ -56,12 +59,13 @@ impl Status {
 
     fn set_binary(&mut self, byte: u8) {
         self.negative = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
-        self.negative = if byte & 0b0100_0000 == 0b0100_0000 { true } else { false };
-        self.negative = if byte & 0b0001_0000 == 0b0001_0000 { true } else { false };
-        self.negative = if byte & 0b0000_1000 == 0b0000_1000 { true } else { false };
-        self.negative = if byte & 0b0000_0100 == 0b0000_0100 { true } else { false };
-        self.negative = if byte & 0b0000_0010 == 0b0000_0010 { true } else { false };
-        self.negative = if byte & 0b0000_0001 == 0b0000_0001 { true } else { false };
+        self.overflow = if byte & 0b0100_0000 == 0b0100_0000 { true } else { false };
+        self.unused = if byte & 0b0010_0000 == 0b0010_0000 { true } else { false };
+        self.break_flg = if byte & 0b0001_0000 == 0b0001_0000 { true } else { false };
+        self.decimal = if byte & 0b0000_1000 == 0b0000_1000 { true } else { false };
+        self.interrupt = if byte & 0b0000_0100 == 0b0000_0100 { true } else { false };
+        self.zero = if byte & 0b0000_0010 == 0b0000_0010 { true } else { false };
+        self.carry = if byte & 0b0000_0001 == 0b0000_0001 { true } else { false };
     }
 }
 
@@ -76,6 +80,7 @@ impl Cpu {
             status: Status {
                 negative: false,
                 overflow: false,
+                unused: false,
                 break_flg: false,
                 decimal: false,
                 interrupt: false,
@@ -88,14 +93,12 @@ impl Cpu {
 
     pub fn reset(&mut self) {
         self.status.interrupt = true;
+        self.status.unused = true;
         self.sp = 0xFD;
         self.pc = self.read_word(0xFFFC);
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xC034 {
-            println!();
-        }
         if *nmi {
             println!("Enter NMI");
             self.process_nmi();
@@ -290,17 +293,26 @@ impl Cpu {
             0x01 => ORA { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
             0x11 => ORA { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
 
+            0x2A => ROL { addressing: Accumulator, cycle: 5 },
+            0x26 => ROL { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
+            0x36 => ROL { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
+            0x2E => ROL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
+            0x3E => ROL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+
             0x6A => ROR { addressing: Accumulator, cycle: 5 },
             0x66 => ROR { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
             0x76 => ROR { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
             0x6E => ROR { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
             0x7E => ROR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
 
-            0x2A => ROL { addressing: Accumulator, cycle: 5 },
-            0x26 => ROL { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 5 },
-            0x36 => ROL { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 6 },
-            0x2E => ROL { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 6 },
-            0x3E => ROL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
+            0xE9 => SBC { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xE5 => SBC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
+            0xF5 => SBC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
+            0xED => SBC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
+            0xFD => SBC { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 4 },
+            0xF9 => SBC { addressing: AbsoluteY(self.resolve_addressing(AddressingMode::AbsoluteY)), cycle: 4 },
+            0xE1 => SBC { addressing: IndexedIndirect(self.resolve_addressing(AddressingMode::IndexedIndirect)), cycle: 6 },
+            0xF1 => SBC { addressing: IndirectIndexed(self.resolve_addressing(AddressingMode::IndirectIndexed)), cycle: 5 },
 
             // スタック命令 comp
             0x48 => PHA { cycle: 3 },
@@ -634,6 +646,21 @@ impl Cpu {
                 }
                 cycle
             }
+            SBC { addressing, cycle, .. } => {
+                match addressing {
+                    Immediate(operand) |
+                    Zeropage(operand) |
+                    ZeropageX(operand) |
+                    Absolute(operand) |
+                    AbsoluteX(operand) |
+                    AbsoluteY(operand) |
+                    IndirectIndexed(operand) |
+                    IndexedIndirect(operand)
+                    => self.sbc(operand),
+                    _ => panic!("Invalid Operation SBC addressing: {:?}", addressing)
+                }
+                cycle
+            }
             PHA { cycle } => {
                 self.pha();
                 cycle
@@ -878,17 +905,16 @@ impl Cpu {
 
     fn compare(&mut self, operand: u16, target_register: u8) {
         let byte = self.read_byte(operand);
-        let result = target_register as i8 - byte as i8;
+        let result = target_register.wrapping_sub(byte);
 
-        self.status.zero = if result == 0 { true } else { false };
+        self.update_negative_flag(result);
+        self.update_zero_flag(result);
 
-        if result >= 0 {
-            self.status.negative = false;
-            self.status.carry = true;
+        if result == 0 || result & 0x80 == 0 {
+            self.status.carry = true
         } else {
-            self.status.negative = true;
-            self.status.carry = false;
-        };
+            self.status.carry = false
+        }
     }
 
     fn dec(&mut self, operand: u16) {
@@ -998,6 +1024,22 @@ impl Cpu {
         self.update_negative_flag(result);
         self.status.carry = after_carry_flag;
         result
+    }
+
+    fn sbc(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        let carry: u8 = if self.status.carry == true { 0x00 } else { 0x01 };
+        let result = self.a.wrapping_sub(byte).wrapping_sub(carry);
+
+        if result > self.a {
+            self.status.carry = true;
+        } else {
+            self.status.carry = false;
+        }
+        self.update_overflow_flag(self.a, byte, result);
+        self.a = result;
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
     }
 
     // スタック命令
