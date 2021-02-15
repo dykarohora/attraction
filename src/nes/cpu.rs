@@ -99,8 +99,8 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xCFA2 {
-c            println!("");
+        if self.pc == 0xD4FB {
+            println!("");
         }
         if *nmi {
             println!("Enter NMI");
@@ -239,7 +239,7 @@ c            println!("");
             0x1E => ASL { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
 
             0x24 => BIT { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
-            0x2C => BIT { addressing: Absolute(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 4 },
+            0x2C => BIT { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
 
             0xC9 => CMP { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xC5 => CMP { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
@@ -312,6 +312,7 @@ c            println!("");
             0x7E => ROR { addressing: AbsoluteX(self.resolve_addressing(AddressingMode::AbsoluteX)), cycle: 7 },
 
             0xE9 => SBC { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
+            0xEB => SBC { addressing: Immediate(self.resolve_addressing(AddressingMode::Immediate)), cycle: 2 },
             0xE5 => SBC { addressing: Zeropage(self.resolve_addressing(AddressingMode::Zeropage)), cycle: 3 },
             0xF5 => SBC { addressing: ZeropageX(self.resolve_addressing(AddressingMode::ZeropageX)), cycle: 4 },
             0xED => SBC { addressing: Absolute(self.resolve_addressing(AddressingMode::Absolute)), cycle: 4 },
@@ -398,7 +399,7 @@ c            println!("");
                     Absolute(operand) |
                     AbsoluteX(operand) |
                     Zeropage(operand) |
-                    ZeropageY(operand)
+                    ZeropageX(operand)
                     => self.ldy(operand),
                     _ => panic!("Invalid Operation LDY addressing: {:?}", addressing)
                 }
