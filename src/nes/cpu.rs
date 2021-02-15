@@ -99,8 +99,8 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xCBC6 {
-            println!("");
+        if self.pc == 0xCFA2 {
+c            println!("");
         }
         if *nmi {
             println!("Enter NMI");
@@ -149,13 +149,16 @@ impl Cpu {
             }
             IndexedIndirect => {
                 let byte = self.fetch_byte();
-                let base_address = byte.wrapping_add(self.x) as u16;
-                self.read_word(base_address)
+                let base_address = byte.wrapping_add(self.x);
+                let low = self.read_byte(base_address as u16) as u16;
+                let high = self.read_byte(base_address.wrapping_add(1) as u16) as u16;
+                let address = (high << 8) | low;
+                address
             }
             IndirectIndexed => {
-                let byte = self.fetch_byte() as u16;
-                let low = self.read_byte(byte) as u16;
-                let high = self.read_byte(byte + 1) as u16;
+                let byte = self.fetch_byte();
+                let low = self.read_byte(byte as u16) as u16;
+                let high = self.read_byte(byte.wrapping_add(1) as u16) as u16;
                 let address = ((high << 8) | low).wrapping_add(self.y as u16);
                 address
             }
