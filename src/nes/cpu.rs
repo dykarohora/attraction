@@ -99,7 +99,7 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xCF63 {
+        if self.pc == 0xCBC6 {
             println!("");
         }
         if *nmi {
@@ -430,7 +430,7 @@ impl Cpu {
                     Zeropage(operand) |
                     ZeropageX(operand) |
                     Absolute(operand)
-                    => self.stx(operand),
+                    => self.sty(operand),
                     _ => panic!("Invalid Operation STY addressing: {:?}", addressing)
                 }
                 cycle
@@ -850,7 +850,8 @@ impl Cpu {
             self.status.carry = false;
         }
 
-        self.update_overflow_flag(self.a, byte, result);
+        // Aレジスタとメモリ値の符号が同じで、かつ結果がAレジスタの符号と反転していた場合はオーバーフローをセットする
+        self.status.overflow = if ((self.a ^ byte) & 0x80 == 0x00) && ((self.a ^ result) & 0x80 == 0x80) { true } else { false };
         self.a = result;
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
@@ -911,7 +912,12 @@ impl Cpu {
         self.update_negative_flag(result);
         self.update_zero_flag(result);
 
-        if result == 0 || result & 0x80 == 0 {
+        // 桁下がりがないときはキャリーをセット
+        // 桁下がりがあるときはキャリーをクリア
+        // targetのbit7とresultのbit7の　XORが1ならばキャリーをクリア
+        // TODO もう少し賢くできないものか
+        let result_carry = (target_register as i16) - (byte as i16);
+        if result_carry >= 0 {
             self.status.carry = true
         } else {
             self.status.carry = false
@@ -1033,12 +1039,18 @@ impl Cpu {
         let carry: u8 = if self.status.carry == true { 0x00 } else { 0x01 };
         let result = self.a.wrapping_sub(byte).wrapping_sub(carry);
 
-        if result > self.a {
+        // 桁下がりがないときはキャリーをセット
+        // 桁下がりがあるときはキャリーをクリア
+        // TODO もうすこし賢く
+        let result_carry = (self.a as i16) - (byte as i16) - (carry as i16);
+        if result_carry >= 0 {
             self.status.carry = true;
         } else {
             self.status.carry = false;
         }
-        self.update_overflow_flag(self.a, byte, result);
+
+        // Aレジスタとメモリ値の符号が異なり、かつ結果がAレジスタの符号と反転していた場合はオーバーフローをセットする
+        self.status.overflow = if ((self.a ^ byte) & 0x80 == 0x80) && ((self.a ^ result) & 0x80 == 0x80) { true } else { false };
         self.a = result;
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
@@ -1323,19 +1335,6 @@ impl Cpu {
 
     fn update_zero_flag(&mut self, calculation_result: u8) {
         self.status.zero = if calculation_result == 0 { true } else { false };
-    }
-
-    fn update_overflow_flag(&mut self, target: u8, added_byte: u8, calculation_result: u8) {
-        if (target ^ added_byte) & 0x80 != 0x00 {
-            self.status.overflow = false;
-            return;
-        }
-
-        if (target ^ calculation_result) & 0x80 != 0x80 {
-            self.status.overflow = false
-        } else {
-            self.status.overflow = true
-        }
     }
 }
 
