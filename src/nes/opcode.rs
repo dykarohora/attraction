@@ -16,61 +16,15 @@ pub enum AddressingMode {
     IndexedIndirect,
 }
 
-pub enum Addressing {
-    Accumulator,
-    Immediate(u16),
-    Absolute(u16),
-    Zeropage(u16),
-    AbsoluteX(u16),
-    AbsoluteY(u16),
-    ZeropageX(u16),
-    ZeropageY(u16),
-    Indirect(u16),
-    IndirectIndexed(u16),
-    IndexedIndirect(u16),
-}
-
-impl fmt::Debug for Addressing {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match *self {
-            Addressing::Accumulator =>
-                write!(f, "Accumulator"),
-            Addressing::Immediate(addr) =>
-                write!(f, "Immediate {:#06X}", addr),
-            Addressing::Absolute(addr) =>
-                write!(f, "Absolute {:#06X}", addr),
-            Addressing::Zeropage(addr) =>
-                write!(f, "Zeropage {:#06X}", addr),
-            Addressing::AbsoluteX(addr) =>
-                write!(f, "AbsoluteX {:#06X}", addr),
-            Addressing::AbsoluteY(addr) =>
-                write!(f, "AbsoluteY {:#06X}", addr),
-            Addressing::ZeropageX(addr) =>
-                write!(f, "ZeropageX {:#06X}", addr),
-            Addressing::ZeropageY(addr) =>
-                write!(f, "ZeropageY {:#06X}", addr),
-            Addressing::Indirect(addr) =>
-                write!(f, "Indirect {:#06X}", addr),
-            Addressing::IndirectIndexed(addr) =>
-                write!(f, "IndirectIndexed {:#06X}", addr),
-            Addressing::IndexedIndirect(addr) =>
-                write!(f, "IndexedIndirect {:#06X}", addr)
-        }
-    }
-}
-
-
-// TODO デバッグ
-
 #[derive(Debug)]
 pub enum Instruction {
     // 転送命令
-    LDA { addressing: Addressing, cycle: u16 },
-    LDX { addressing: Addressing, cycle: u16 },
-    LDY { addressing: Addressing, cycle: u16 },
-    STA { addressing: Addressing, cycle: u16 },
-    STX { addressing: Addressing, cycle: u16 },
-    STY { addressing: Addressing, cycle: u16 },
+    LDA { addressing: AddressingMode, cycle: u16 },
+    LDX { addressing: AddressingMode, cycle: u16 },
+    LDY { addressing: AddressingMode, cycle: u16 },
+    STA { addressing: AddressingMode, cycle: u16 },
+    STX { addressing: AddressingMode, cycle: u16 },
+    STY { addressing: AddressingMode, cycle: u16 },
     TAX { cycle: u16 },
     TAY { cycle: u16 },
     TSX { cycle: u16 },
@@ -79,30 +33,30 @@ pub enum Instruction {
     TYA { cycle: u16 },
 
     // 算術命令
-    ADC { addressing: Addressing, cycle: u16 },
-    AND { addressing: Addressing, cycle: u16 },
-    ASL { addressing: Addressing, cycle: u16 },
-    BIT { addressing: Addressing, cycle: u16 },
+    ADC { addressing: AddressingMode, cycle: u16 },
+    AND { addressing: AddressingMode, cycle: u16 },
+    ASL { addressing: AddressingMode, cycle: u16 },
+    BIT { addressing: AddressingMode, cycle: u16 },
 
-    CMP { addressing: Addressing, cycle: u16 },
-    CPX { addressing: Addressing, cycle: u16 },
-    CPY { addressing: Addressing, cycle: u16 },
+    CMP { addressing: AddressingMode, cycle: u16 },
+    CPX { addressing: AddressingMode, cycle: u16 },
+    CPY { addressing: AddressingMode, cycle: u16 },
 
-    DEC { addressing: Addressing, cycle: u16 },
+    DEC { addressing: AddressingMode, cycle: u16 },
     DEX { cycle: u16 },
     DEY { cycle: u16 },
 
-    EOR { addressing: Addressing, cycle: u16 },
+    EOR { addressing: AddressingMode, cycle: u16 },
 
-    INC { addressing: Addressing, cycle: u16 },
+    INC { addressing: AddressingMode, cycle: u16 },
     INX { cycle: u16 },
     INY { cycle: u16 },
 
-    LSR { addressing: Addressing, cycle: u16 },
-    ORA { addressing: Addressing, cycle: u16 },
-    ROL { addressing: Addressing, cycle: u16 },
-    ROR { addressing: Addressing, cycle: u16 },
-    SBC { addressing: Addressing, cycle: u16 },
+    LSR { addressing: AddressingMode, cycle: u16 },
+    ORA { addressing: AddressingMode, cycle: u16 },
+    ROL { addressing: AddressingMode, cycle: u16 },
+    ROR { addressing: AddressingMode, cycle: u16 },
+    SBC { addressing: AddressingMode, cycle: u16 },
 
     // スタック命令
     PHA { cycle: u16 },
@@ -111,7 +65,7 @@ pub enum Instruction {
     PLP { cycle: u16 },
 
     // ジャンプ命令
-    JMP { addressing: Addressing, cycle: u16 },
+    JMP { addressing: AddressingMode, cycle: u16 },
     JSR { cycle: u16 },
     RTS { cycle: u16 },
     RTI { cycle: u16 },
