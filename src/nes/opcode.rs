@@ -32,6 +32,9 @@ pub enum Instruction {
     TXS { cycle: u16 },
     TYA { cycle: u16 },
 
+    LAX { addressing: AddressingMode, cycle: u16 }, // unofficial
+    SAX { addressing: AddressingMode, cycle: u16 }, // unofficial
+
     // 算術命令
     ADC { addressing: AddressingMode, cycle: u16 },
     AND { addressing: AddressingMode, cycle: u16 },
@@ -58,7 +61,7 @@ pub enum Instruction {
     ROR { addressing: AddressingMode, cycle: u16 },
     SBC { addressing: AddressingMode, cycle: u16 },
     SLO { addressing: AddressingMode, cycle: u16 },
-    // unofficial
+
     RLA { addressing: AddressingMode, cycle: u16 }, // unofficial
 
     // スタック命令
@@ -95,7 +98,8 @@ pub enum Instruction {
     // その他
     BRK { cycle: u16 },
     NOP { cycle: u16 },
-    DOP { addressing: AddressingMode, cycle: u16 }, // unofficial
+    DOP { addressing: AddressingMode, cycle: u16 },
+    // unofficial
     TOP { addressing: AddressingMode, cycle: u16 }, // unofficial
 }
 

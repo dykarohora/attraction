@@ -2,9 +2,10 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Instruction, AddressingMode};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA, DOP, TOP};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA, DOP, TOP, LAX, SAX};
 use std::sync::atomic::compiler_fence;
 use crate::nes::opcode::AddressingMode::{Immediate, Zeropage, ZeropageX, Absolute, AbsoluteY, AbsoluteX, IndexedIndirect, IndirectIndexed, ZeropageY, Accumulator, Indirect};
+use core::num::FpCategory::Zero;
 
 #[derive(Default)]
 pub struct Cpu {
@@ -213,6 +214,18 @@ impl Cpu {
             0x8A => TXA { cycle: 2 },
             0x9A => TXS { cycle: 2 },
             0x98 => TYA { cycle: 2 },
+
+            0xA7 => LAX { addressing: Zeropage, cycle: 3 },
+            0xB7 => LAX { addressing: ZeropageY, cycle: 4 },
+            0xAF => LAX { addressing: Absolute, cycle: 4 },
+            0xBF => LAX { addressing: AbsoluteY, cycle: 4 },
+            0xA3 => LAX { addressing: IndexedIndirect, cycle: 6 },
+            0xB3 => LAX { addressing: IndirectIndexed, cycle: 5 },
+
+            0x87 => SAX { addressing: Zeropage, cycle: 3 },
+            0x97 => SAX { addressing: ZeropageY, cycle: 4 },
+            0x83 => SAX { addressing: IndexedIndirect, cycle: 6 },
+            0x8F => SAX { addressing: Absolute, cycle: 4 },
 
             // 算術命令
             0x69 => ADC { addressing: Immediate, cycle: 2 },
@@ -528,7 +541,37 @@ impl Cpu {
                 self.tya();
                 cycle
             }
-            ADC { addressing, cycle, .. } => {
+            LAX { addressing, cycle } => {
+                match addressing {
+                    Zeropage |
+                    ZeropageY |
+                    Absolute |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.lax(address);
+                    }
+                    _ => panic!("Invalid Operation LAX addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            SAX { addressing, cycle} => {
+                match addressing {
+                    Zeropage |
+                    ZeropageY |
+                    Absolute |
+                    IndexedIndirect
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.sax(address);
+                    }
+                    _ => panic!("Invalid Operation SAX addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            ADC { addressing, cycle} => {
                 match addressing {
                     Immediate |
                     Zeropage |
@@ -943,34 +986,47 @@ impl Cpu {
     }
 
     // 転送命令
-    fn lda(&mut self, operand: u16) {
-        self.a = self.read_byte(operand);
+    fn lda(&mut self, address: u16) {
+        self.a = self.read_byte(address);
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
     }
 
-    fn ldx(&mut self, operand: u16) {
-        self.x = self.read_byte(operand);
+    fn ldx(&mut self, address: u16) {
+        self.x = self.read_byte(address);
         self.update_negative_flag(self.x);
         self.update_zero_flag(self.x);
     }
 
-    fn ldy(&mut self, operand: u16) {
-        self.y = self.read_byte(operand);
+    fn ldy(&mut self, address: u16) {
+        self.y = self.read_byte(address);
         self.update_negative_flag(self.y);
         self.update_zero_flag(self.y);
     }
 
-    fn sta(&mut self, operand: u16) {
-        self.write_byte(operand, self.a);
+    fn lax(&mut self, address: u16) {
+        let byte = self.read_byte(address);
+        self.a = byte;
+        self.x = byte;
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
     }
 
-    fn stx(&mut self, operand: u16) {
-        self.write_byte(operand, self.x);
+    fn sax(&mut self, address: u16) {
+        let byte = self.a & self.x;
+        self.write_byte(address, byte);
     }
 
-    fn sty(&mut self, operand: u16) {
-        self.write_byte(operand, self.y);
+    fn sta(&mut self, address: u16) {
+        self.write_byte(address, self.a);
+    }
+
+    fn stx(&mut self, address: u16) {
+        self.write_byte(address, self.x);
+    }
+
+    fn sty(&mut self, address: u16) {
+        self.write_byte(address, self.y);
     }
 
     fn tax(&mut self) {
@@ -1008,8 +1064,8 @@ impl Cpu {
     }
 
     // 算術命令
-    fn adc(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn adc(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let carry: u8 = if self.status.carry == true { 0x01 } else { 0x00 };
         let result = self.a.wrapping_add(byte).wrapping_add(carry);
 
@@ -1026,8 +1082,8 @@ impl Cpu {
         self.update_zero_flag(self.a);
     }
 
-    fn and(&mut self, operand: u16) {
-        self.a &= self.read_byte(operand);
+    fn and(&mut self, address: u16) {
+        self.a &= self.read_byte(address);
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
     }
@@ -1036,10 +1092,10 @@ impl Cpu {
         self.a = self.asl_calc(self.a);
     }
 
-    fn asl(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn asl(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let result = self.asl_calc(byte);
-        self.write_byte(operand, result);
+        self.write_byte(address, result);
     }
 
     fn asl_calc(&mut self, target_byte: u8) -> u8 {
@@ -1051,8 +1107,8 @@ impl Cpu {
         result
     }
 
-    fn bit(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn bit(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         // ネガティブフラグはbyteのbit7をストアする
         self.status.negative = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
         // オーバーフローフラグはbyteのbit6をストアする
@@ -1062,20 +1118,20 @@ impl Cpu {
         self.update_zero_flag(result);
     }
 
-    fn cmp(&mut self, operand: u16) {
-        self.compare(operand, self.a);
+    fn cmp(&mut self, address: u16) {
+        self.compare(address, self.a);
     }
 
-    fn cpx(&mut self, operand: u16) {
-        self.compare(operand, self.x);
+    fn cpx(&mut self, address: u16) {
+        self.compare(address, self.x);
     }
 
-    fn cpy(&mut self, operand: u16) {
-        self.compare(operand, self.y);
+    fn cpy(&mut self, address: u16) {
+        self.compare(address, self.y);
     }
 
-    fn compare(&mut self, operand: u16, target_register: u8) {
-        let byte = self.read_byte(operand);
+    fn compare(&mut self, address: u16, target_register: u8) {
+        let byte = self.read_byte(address);
         let result = target_register.wrapping_sub(byte);
 
         self.update_negative_flag(result);
@@ -1093,10 +1149,10 @@ impl Cpu {
         }
     }
 
-    fn dec(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn dec(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let result = byte.wrapping_sub(1);
-        self.write_byte(operand, result);
+        self.write_byte(address, result);
         self.update_negative_flag(result);
         self.update_zero_flag(result);
     }
