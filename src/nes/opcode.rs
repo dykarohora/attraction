@@ -57,7 +57,8 @@ pub enum Instruction {
     ROL { addressing: AddressingMode, cycle: u16 },
     ROR { addressing: AddressingMode, cycle: u16 },
     SBC { addressing: AddressingMode, cycle: u16 },
-    SLO { addressing: AddressingMode, cycle: u16 }, // unofficial
+    SLO { addressing: AddressingMode, cycle: u16 },
+    // unofficial
     RLA { addressing: AddressingMode, cycle: u16 }, // unofficial
 
     // スタック命令
@@ -94,5 +95,7 @@ pub enum Instruction {
     // その他
     BRK { cycle: u16 },
     NOP { cycle: u16 },
+    DOP { addressing: AddressingMode, cycle: u16 }, // unofficial
+    TOP { addressing: AddressingMode, cycle: u16 }, // unofficial
 }
 

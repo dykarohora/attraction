@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Instruction, AddressingMode};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA, DOP, TOP};
 use std::sync::atomic::compiler_fence;
 use crate::nes::opcode::AddressingMode::{Immediate, Zeropage, ZeropageX, Absolute, AbsoluteY, AbsoluteX, IndexedIndirect, IndirectIndexed, ZeropageY, Accumulator, Indirect};
 
@@ -99,9 +99,6 @@ impl Cpu {
     }
 
     pub fn run(&mut self, nmi: &mut bool) -> u16 {
-        if self.pc == 0xD4FB {
-            println!("");
-        }
         if *nmi {
             println!("Enter NMI");
             self.process_nmi();
@@ -375,7 +372,37 @@ impl Cpu {
 
             // その他 comp
             0x00 => BRK { cycle: 7 },
+
+            0x1A => NOP { cycle: 2 },
+            0x3A => NOP { cycle: 2 },
+            0x5A => NOP { cycle: 2 },
+            0x7A => NOP { cycle: 2 },
+            0xDA => NOP { cycle: 2 },
             0xEA => NOP { cycle: 2 },
+            0xFA => NOP { cycle: 2 },
+
+            0x04 => DOP { addressing: Zeropage, cycle: 3 },
+            0x14 => DOP { addressing: ZeropageX, cycle: 4 },
+            0x34 => DOP { addressing: ZeropageX, cycle: 4 },
+            0x44 => DOP { addressing: Zeropage, cycle: 3 },
+            0x54 => DOP { addressing: ZeropageX, cycle: 4 },
+            0x64 => DOP { addressing: Zeropage, cycle: 3 },
+            0x74 => DOP { addressing: ZeropageX, cycle: 4 },
+            0x80 => DOP { addressing: Immediate, cycle: 2 },
+            0x82 => DOP { addressing: Immediate, cycle: 2 },
+            0x89 => DOP { addressing: Immediate, cycle: 2 },
+            0xC2 => DOP { addressing: Immediate, cycle: 2 },
+            0xD4 => DOP { addressing: ZeropageX, cycle: 4 },
+            0xE2 => DOP { addressing: Immediate, cycle: 2 },
+            0xF4 => DOP { addressing: ZeropageX, cycle: 4 },
+
+            0x0C => TOP { addressing: Absolute, cycle: 4 },
+            0x1C => TOP { addressing: AbsoluteX, cycle: 4 },
+            0x3C => TOP { addressing: AbsoluteX, cycle: 4 },
+            0x5C => TOP { addressing: AbsoluteX, cycle: 4 },
+            0x7C => TOP { addressing: AbsoluteX, cycle: 4 },
+            0xDC => TOP { addressing: AbsoluteX, cycle: 4 },
+            0xFC => TOP { addressing: AbsoluteX, cycle: 4 },
 
             _ => panic!("[CPU] Not implemented opcode: {:#04X}", opcode)
         }
@@ -768,7 +795,7 @@ impl Cpu {
                 }
                 cycle
             }
-            RLA {addressing, cycle} => {
+            RLA { addressing, cycle } => {
                 match addressing {
                     Zeropage |
                     ZeropageX |
@@ -891,6 +918,25 @@ impl Cpu {
                 cycle
             }
             NOP { cycle } => {
+                cycle
+            }
+            DOP { addressing, cycle } => {
+                match addressing {
+                    Immediate |
+                    Zeropage |
+                    ZeropageX
+                    => { self.resolve_address(addressing); }
+                    _ => panic!("Invalid Operation DOP addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            TOP { addressing, cycle } => {
+                match addressing {
+                    Absolute |
+                    AbsoluteX
+                    => { self.resolve_address(addressing); }
+                    _ => panic!("Invalid Operation TOP addressing: {:?}", addressing)
+                }
                 cycle
             }
         }
