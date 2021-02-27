@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Instruction, AddressingMode};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA};
 use std::sync::atomic::compiler_fence;
 use crate::nes::opcode::AddressingMode::{Immediate, Zeropage, ZeropageX, Absolute, AbsoluteY, AbsoluteX, IndexedIndirect, IndirectIndexed, ZeropageY, Accumulator, Indirect};
 
@@ -144,8 +144,12 @@ impl Cpu {
                 byte.wrapping_add(self.y) as u16
             }
             Indirect => {
-                let word = self.fetch_word();
-                self.read_word(word)
+                let base_low = self.fetch_byte();
+                let base_high = self.fetch_byte() as u16;
+                let low_address = self.read_byte((base_high << 8) | (base_low as u16)) as u16;
+                let high_address = self.read_byte((base_high << 8) | (base_low.wrapping_add(1) as u16)) as u16;
+                let address = (high_address << 8) | low_address;
+                address
             }
             IndexedIndirect => {
                 let byte = self.fetch_byte();
@@ -320,6 +324,22 @@ impl Cpu {
             0xF9 => SBC { addressing: AbsoluteY, cycle: 4 },
             0xE1 => SBC { addressing: IndexedIndirect, cycle: 6 },
             0xF1 => SBC { addressing: IndirectIndexed, cycle: 5 },
+
+            0x07 => SLO { addressing: Zeropage, cycle: 5 },
+            0x17 => SLO { addressing: ZeropageX, cycle: 6 },
+            0x0F => SLO { addressing: Absolute, cycle: 6 },
+            0x1F => SLO { addressing: AbsoluteX, cycle: 7 },
+            0x1B => SLO { addressing: AbsoluteY, cycle: 7 },
+            0x03 => SLO { addressing: IndexedIndirect, cycle: 8 },
+            0x13 => SLO { addressing: IndirectIndexed, cycle: 8 },
+
+            0x27 => RLA { addressing: Zeropage, cycle: 5 },
+            0x37 => RLA { addressing: ZeropageX, cycle: 6 },
+            0x2F => RLA { addressing: Absolute, cycle: 6 },
+            0x3F => RLA { addressing: AbsoluteX, cycle: 7 },
+            0x3B => RLA { addressing: AbsoluteY, cycle: 7 },
+            0x23 => RLA { addressing: IndexedIndirect, cycle: 8 },
+            0x33 => RLA { addressing: IndirectIndexed, cycle: 8 },
 
             // スタック命令 comp
             0x48 => PHA { cycle: 3 },
@@ -731,6 +751,40 @@ impl Cpu {
                 }
                 cycle
             }
+            SLO { addressing, cycle } => {
+                match addressing {
+                    Zeropage |
+                    ZeropageX |
+                    Absolute |
+                    AbsoluteX |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.slo(address);
+                    }
+                    _ => panic!("Invalid Operation SLO addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            RLA {addressing, cycle} => {
+                match addressing {
+                    Zeropage |
+                    ZeropageX |
+                    Absolute |
+                    AbsoluteX |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.rla(address);
+                    }
+                    _ => panic!("Invalid Operation RLA addressing: {:?}", addressing)
+                }
+                cycle
+            }
             PHA { cycle } => {
                 self.pha();
                 cycle
@@ -1125,6 +1179,21 @@ impl Cpu {
         self.update_zero_flag(self.a);
     }
 
+    fn slo(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        self.a = self.a | (byte << 1);
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
+        self.status.carry = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
+    }
+
+    fn rla(&mut self, operand: u16) {
+        let byte = self.read_byte(operand);
+        self.a = ((byte << 1) | if self.status.carry == true { 1 } else { 0 }) & self.a;
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
+        self.status.carry = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
+    }
     // スタック命令
     fn pha(&mut self) {
         self.push_to_stack(self.a);
@@ -1399,7 +1468,7 @@ impl Cpu {
     }
 
     fn update_negative_flag(&mut self, calculation_result: u8) {
-        self.status.negative = if (calculation_result & 0b1000_0000) >> 7 == 1 { true } else { false };
+        self.status.negative = if (calculation_result & 0b1000_0000) == 0b1000_0000 { true } else { false };
     }
 
     fn update_zero_flag(&mut self, calculation_result: u8) {
