@@ -132,8 +132,8 @@ impl Cpu {
                 address
             }
             Absolute => self.fetch_word(),
-            AbsoluteX => self.fetch_word() + (self.x as u16),
-            AbsoluteY => self.fetch_word() + (self.y as u16),
+            AbsoluteX => self.fetch_word().wrapping_add(self.x as u16),
+            AbsoluteY => self.fetch_word().wrapping_add(self.y as u16),
             Zeropage => self.fetch_byte() as u16,
             ZeropageX => {
                 let byte = self.fetch_byte();
@@ -184,9 +184,9 @@ impl Cpu {
 
             0xA2 => LDX { addressing: Immediate, cycle: 2 },
             0xA6 => LDX { addressing: Zeropage, cycle: 3 },
-            0xB6 => LDX { addressing: ZeropageX, cycle: 4 },
+            0xB6 => LDX { addressing: ZeropageY, cycle: 4 },
             0xAE => LDX { addressing: Absolute, cycle: 4 },
-            0xBE => LDX { addressing: AbsoluteX, cycle: 4 },
+            0xBE => LDX { addressing: AbsoluteY, cycle: 4 },
 
             0xA0 => LDY { addressing: Immediate, cycle: 2 },
             0xA4 => LDY { addressing: Zeropage, cycle: 3 },
