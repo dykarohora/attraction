@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use crate::nes::cpu_bus::CpuBus;
 use crate::nes::opcode::{Instruction, AddressingMode};
-use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA, DOP, TOP, LAX, SAX};
+use crate::nes::opcode::Instruction::{BPL, AND, JMP, SEI, STY, DEY, STA, TXS, LDY, LDX, LDA, DEC, BNE, CLD, CPX, INX, INC, BEQ, STX, DEX, JSR, RTS, CMP, BRK, PHA, TXA, LSR, ROL, TAX, TAY, TSX, TYA, EOR, PLA, RTI, CLC, CLI, CLV, SEC, SED, ADC, INY, BCC, BCS, BMI, BVC, BVS, ASL, ROR, NOP, CPY, BIT, ORA, PHP, PLP, SBC, SLO, RLA, DOP, TOP, LAX, SAX, DCP, ISC, SRE, RRA};
 use std::sync::atomic::compiler_fence;
 use crate::nes::opcode::AddressingMode::{Immediate, Zeropage, ZeropageX, Absolute, AbsoluteY, AbsoluteX, IndexedIndirect, IndirectIndexed, ZeropageY, Accumulator, Indirect};
 use core::num::FpCategory::Zero;
@@ -343,6 +343,14 @@ impl Cpu {
             0x03 => SLO { addressing: IndexedIndirect, cycle: 8 },
             0x13 => SLO { addressing: IndirectIndexed, cycle: 8 },
 
+            0x47 => SRE { addressing: Zeropage, cycle: 5 },
+            0x57 => SRE { addressing: ZeropageX, cycle: 6 },
+            0x4F => SRE { addressing: Absolute, cycle: 6 },
+            0x5F => SRE { addressing: AbsoluteX, cycle: 7 },
+            0x5B => SRE { addressing: AbsoluteY, cycle: 7 },
+            0x43 => SRE { addressing: IndexedIndirect, cycle: 8 },
+            0x53 => SRE { addressing: IndirectIndexed, cycle: 8 },
+
             0x27 => RLA { addressing: Zeropage, cycle: 5 },
             0x37 => RLA { addressing: ZeropageX, cycle: 6 },
             0x2F => RLA { addressing: Absolute, cycle: 6 },
@@ -350,6 +358,30 @@ impl Cpu {
             0x3B => RLA { addressing: AbsoluteY, cycle: 7 },
             0x23 => RLA { addressing: IndexedIndirect, cycle: 8 },
             0x33 => RLA { addressing: IndirectIndexed, cycle: 8 },
+
+            0x67 => RRA { addressing: Zeropage, cycle: 5 },
+            0x77 => RRA { addressing: ZeropageX, cycle: 6 },
+            0x6F => RRA { addressing: Absolute, cycle: 6 },
+            0x7F => RRA { addressing: AbsoluteX, cycle: 7 },
+            0x7B => RRA { addressing: AbsoluteY, cycle: 7 },
+            0x63 => RRA { addressing: IndexedIndirect, cycle: 8 },
+            0x73 => RRA { addressing: IndirectIndexed, cycle: 8 },
+
+            0xC7 => DCP { addressing: Zeropage, cycle: 5 },
+            0xD7 => DCP { addressing: ZeropageX, cycle: 6 },
+            0xCF => DCP { addressing: Absolute, cycle: 6 },
+            0xDF => DCP { addressing: AbsoluteX, cycle: 7 },
+            0xDB => DCP { addressing: AbsoluteY, cycle: 7 },
+            0xC3 => DCP { addressing: IndexedIndirect, cycle: 8 },
+            0xD3 => DCP { addressing: IndirectIndexed, cycle: 8 },
+
+            0xE7 => ISC { addressing: Zeropage, cycle: 5 },
+            0xF7 => ISC { addressing: ZeropageX, cycle: 6 },
+            0xEF => ISC { addressing: Absolute, cycle: 6 },
+            0xFF => ISC { addressing: AbsoluteX, cycle: 7 },
+            0xFB => ISC { addressing: AbsoluteY, cycle: 7 },
+            0xE3 => ISC { addressing: IndexedIndirect, cycle: 8 },
+            0xF3 => ISC { addressing: IndirectIndexed, cycle: 8 },
 
             // スタック命令 comp
             0x48 => PHA { cycle: 3 },
@@ -557,7 +589,7 @@ impl Cpu {
                 }
                 cycle
             }
-            SAX { addressing, cycle} => {
+            SAX { addressing, cycle } => {
                 match addressing {
                     Zeropage |
                     ZeropageY |
@@ -571,7 +603,7 @@ impl Cpu {
                 }
                 cycle
             }
-            ADC { addressing, cycle} => {
+            ADC { addressing, cycle } => {
                 match addressing {
                     Immediate |
                     Zeropage |
@@ -838,6 +870,23 @@ impl Cpu {
                 }
                 cycle
             }
+            SRE { addressing, cycle } => {
+                match addressing {
+                    Zeropage |
+                    ZeropageX |
+                    Absolute |
+                    AbsoluteX |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.sre(address);
+                    }
+                    _ => panic!("Invalid Operation SRE addressing: {:?}", addressing)
+                }
+                cycle
+            }
             RLA { addressing, cycle } => {
                 match addressing {
                     Zeropage |
@@ -852,6 +901,57 @@ impl Cpu {
                         self.rla(address);
                     }
                     _ => panic!("Invalid Operation RLA addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            RRA { addressing, cycle } => {
+                match addressing {
+                    Zeropage |
+                    ZeropageX |
+                    Absolute |
+                    AbsoluteX |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.rra(address);
+                    }
+                    _ => panic!("Invalid Operation RLA addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            DCP { addressing, cycle } => {
+                match addressing {
+                    Zeropage |
+                    ZeropageX |
+                    Absolute |
+                    AbsoluteX |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.dcp(address);
+                    }
+                    _ => panic!("Invalid Operation DCP addressing: {:?}", addressing)
+                }
+                cycle
+            }
+            ISC {addressing, cycle} => {
+                match addressing {
+                    Zeropage |
+                    ZeropageX |
+                    Absolute |
+                    AbsoluteX |
+                    AbsoluteY |
+                    IndexedIndirect |
+                    IndirectIndexed
+                    => {
+                        let address = self.resolve_address(addressing);
+                        self.isc(address);
+                    }
+                    _ => panic!("Invalid Operation ISC addressing: {:?}", addressing)
                 }
                 cycle
             }
@@ -1065,6 +1165,7 @@ impl Cpu {
 
     // 算術命令
     fn adc(&mut self, address: u16) {
+        // TODO もう少し賢く
         let byte = self.read_byte(address);
         let carry: u8 = if self.status.carry == true { 0x01 } else { 0x00 };
         let result = self.a.wrapping_add(byte).wrapping_add(carry);
@@ -1169,17 +1270,17 @@ impl Cpu {
         self.update_zero_flag(self.y);
     }
 
-    fn eor(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn eor(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         self.a = self.a ^ byte;
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
     }
 
-    fn inc(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn inc(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let result = byte.wrapping_add(1);
-        self.write_byte(operand, result);
+        self.write_byte(address, result);
         self.update_negative_flag(result);
         self.update_zero_flag(result);
     }
@@ -1200,10 +1301,10 @@ impl Cpu {
         self.a = self.lsr_calc(self.a);
     }
 
-    fn lsr(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn lsr(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let result = self.lsr_calc(byte);
-        self.write_byte(operand, result);
+        self.write_byte(address, result);
     }
 
     fn lsr_calc(&mut self, target_byte: u8) -> u8 {
@@ -1214,8 +1315,8 @@ impl Cpu {
         result
     }
 
-    fn ora(&mut self, operand: u16) {
-        self.a |= self.read_byte(operand);
+    fn ora(&mut self, address: u16) {
+        self.a |= self.read_byte(address);
         self.update_zero_flag(self.a);
         self.update_negative_flag(self.a);
     }
@@ -1224,10 +1325,10 @@ impl Cpu {
         self.a = self.rol_calc(self.a);
     }
 
-    fn rol(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn rol(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let result = self.rol_calc(byte);
-        self.write_byte(operand, result);
+        self.write_byte(address, result);
     }
 
     fn rol_calc(&mut self, target_byte: u8) -> u8 {
@@ -1244,10 +1345,10 @@ impl Cpu {
         self.a = result;
     }
 
-    fn ror(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn ror(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let result = self.ror_calc(byte);
-        self.write_byte(operand, result);
+        self.write_byte(address, result);
     }
 
     fn ror_calc(&mut self, target_byte: u8) -> u8 {
@@ -1259,8 +1360,8 @@ impl Cpu {
         result
     }
 
-    fn sbc(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn sbc(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         let carry: u8 = if self.status.carry == true { 0x00 } else { 0x01 };
         let result = self.a.wrapping_sub(byte).wrapping_sub(carry);
 
@@ -1281,20 +1382,82 @@ impl Cpu {
         self.update_zero_flag(self.a);
     }
 
-    fn slo(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
+    fn slo(&mut self, address: u16) {
+        let byte = self.read_byte(address);
         self.a = self.a | (byte << 1);
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
         self.status.carry = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
     }
 
-    fn rla(&mut self, operand: u16) {
-        let byte = self.read_byte(operand);
-        self.a = ((byte << 1) | if self.status.carry == true { 1 } else { 0 }) & self.a;
+    fn sre(&mut self, address: u16) {
+        let byte = self.read_byte(address);
+        self.a = self.a ^ (byte >> 1);
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
+        self.status.carry = if byte & 0b0000_0001 == 0b0000_0001 { true } else { false };
+    }
+
+    fn rla(&mut self, address: u16) {
+        let byte = self.read_byte(address);
+        let data = ((byte << 1) | if self.status.carry == true { 0x01 } else { 0x00 });
+        self.a = self.a & data;
         self.update_negative_flag(self.a);
         self.update_zero_flag(self.a);
         self.status.carry = if byte & 0b1000_0000 == 0b1000_0000 { true } else { false };
+        self.write_byte(address, data);
+    }
+
+    fn rra(&mut self, address: u16) {
+        // TODO もう少し賢く
+        let byte = self.read_byte(address);
+        let data = (byte >> 1) | if self.status.carry == true {0x80} else {0x00};
+        let carry: u8 = if self.status.carry == true { 0x01 } else { 0x00 };
+        let result = self.a.wrapping_add(data).wrapping_add(carry);
+
+        if self.a > result {
+            self.status.carry = true;
+        } else {
+            self.status.carry = false;
+        }
+
+        self.status.overflow = if ((self.a ^ byte) & 0x80 == 0x00) && ((self.a ^ result) & 0x80 == 0x80) { true } else { false };
+        self.a = result;
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
+
+        self.write_byte(address, data)
+    }
+
+    fn dcp(&mut self, address: u16) {
+        let byte = self.read_byte(address);
+        if byte == 0 {
+            self.status.carry = false;
+        } else {
+            self.status.carry = true;
+        }
+        let result = byte.wrapping_sub(1);
+        self.write_byte(address, result);
+    }
+
+    fn isc(&mut self, address: u16) {
+        let byte = self.read_byte(address).wrapping_add(1);
+        let carry: u8 = if self.status.carry == true { 0x00 } else { 0x01 };
+        let result = self.a.wrapping_sub(byte).wrapping_sub(carry);
+
+        // TODO もう少し賢く
+        let result_carry = (self.a as i16) - (byte as i16) - (carry as i16);
+        if result_carry >= 0 {
+            self.status.carry = true;
+        } else {
+            self.status.carry = false;
+        }
+
+        self.status.overflow = if ((self.a ^ byte) & 0x80 == 0x80) && ((self.a ^ result) & 0x80 == 0x80) { true } else { false };
+        self.a = result;
+        self.update_negative_flag(self.a);
+        self.update_zero_flag(self.a);
+        self.write_byte(address, byte);
     }
     // スタック命令
     fn pha(&mut self) {
@@ -1317,16 +1480,16 @@ impl Cpu {
     }
 
     // ジャンプ命令
-    fn jmp(&mut self, operand: u16) {
-        self.pc = operand
+    fn jmp(&mut self, address: u16) {
+        self.pc = address
     }
 
-    fn jsr(&mut self, operand: u16) {
+    fn jsr(&mut self, address: u16) {
         // 6502のJSR命令では次の命令の1つ前のアドレス(JSRの最後のバイト)をスタックに入れる
         let program_counter = self.pc - 1;
         self.push_to_stack(((program_counter >> 8) & 0x00ff) as u8);
         self.push_to_stack((program_counter & 0x00ff) as u8);
-        self.pc = operand
+        self.pc = address
     }
 
     fn rts(&mut self) {
